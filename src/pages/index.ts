@@ -5,3 +5,4 @@ export { StudentDashboard } from './StudentDashboard';
 export { AdminDashboard } from './AdminDashboard';
 export { CourseCatalogPage } from './CourseCatalogPage';
 export { SettingsPage } from './SettingsPage';
+export { PaymentCallbackPage } from './PaymentCallbackPage';

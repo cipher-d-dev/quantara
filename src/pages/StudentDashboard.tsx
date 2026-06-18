@@ -8,12 +8,17 @@ import { DashboardLayout } from '../components/layout';
 import { Card, Badge, Button, CourseCardSkeleton, ConfirmModal } from '../components/ui';
 import { CourseCard } from '../components/CourseCard';
 import Logo from '../components/ui/Logo';
+import { RegisterPackageModal } from '../components/RegisterPackageModal';
+import type { Course } from '../types/database';
+import { formatNaira } from '../lib/packages';
 
 export function StudentDashboard() {
   const { user } = useAuth();
   const toast = useToast();
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [showUnregisterModal, setShowUnregisterModal] = useState(false);
+  const [selectedCourseForReg, setSelectedCourseForReg] = useState<Course | null>(null);
+  const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
 
   const { data: courses, isLoading: coursesLoading } = useCoursesForUser(user?.id);
   const { data: registrations, isLoading: registrationsLoading } = useMyRegistrations(user?.id);
@@ -28,17 +33,44 @@ export function StudentDashboard() {
     registrations?.map((r) => ({
       ...r.course,
       registrationId: r.id,
+      packageType: r.package_type,
+      deliveryLocation: r.delivery_location,
+      amountKobo: r.amount_kobo,
+      paymentStatus: r.payment_status,
       registeredAt: r.created_at,
     })) || [];
 
   const availableCourses = courses?.filter((c) => !c.is_registered) || [];
 
-  const handleRegister = async (courseId: string) => {
+  const handleRegisterClick = (courseId: string) => {
+    const course = courses?.find((c) => c.id === courseId);
+    if (!course) return;
+    setSelectedCourseForReg(course);
+    setIsPackageModalOpen(true);
+  };
+
+  const handleRegisterComplete = async (params: {
+    packageType: 'basic' | 'pro';
+    deliveryLocation: string;
+    paymentReference: string;
+    amountKobo: number;
+  }) => {
+    if (!selectedCourseForReg || !user) return;
+
     try {
-      await registerMutation.mutateAsync({ userId: user.id, courseId });
+      await registerMutation.mutateAsync({
+        userId: user.id,
+        courseId: selectedCourseForReg.id,
+        packageType: params.packageType,
+        deliveryLocation: params.deliveryLocation,
+        paymentReference: params.paymentReference,
+        paymentStatus: 'paid',
+        amountKobo: params.amountKobo,
+      });
       toast.success('Successfully registered!');
     } catch (error) {
       toast.error('Registration failed', (error as Error).message);
+      throw error;
     }
   };
 
@@ -150,7 +182,7 @@ export function StudentDashboard() {
                       <CourseCard
                         key={course.id}
                         course={course}
-                        onRegister={handleRegister}
+                        onRegister={handleRegisterClick}
                         isRegistering={registerMutation.isPending}
                       />
                     ))}
@@ -207,6 +239,14 @@ export function StudentDashboard() {
                         <h4 className="text-sm font-medium text-surface-900 dark:text-surface-100 line-clamp-1">
                           {course.title}
                         </h4>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-surface-600 dark:text-surface-400">
+                          <span className="capitalize">{course.packageType} package</span>
+                          <span>{formatNaira(course.amountKobo)}</span>
+                          <span className="capitalize">{course.paymentStatus}</span>
+                        </div>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 line-clamp-1">
+                          Delivery: {course.deliveryLocation}
+                        </p>
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                           Registered {new Date(course.registeredAt).toLocaleDateString()}
                         </p>
@@ -232,6 +272,17 @@ export function StudentDashboard() {
         confirmText="Unregister"
         variant="danger"
         loading={unregisterMutation.isPending}
+      />
+
+      <RegisterPackageModal
+        isOpen={isPackageModalOpen}
+        onClose={() => {
+          setIsPackageModalOpen(false);
+          setSelectedCourseForReg(null);
+        }}
+        course={selectedCourseForReg}
+        onRegisterComplete={handleRegisterComplete}
+        isRegistering={registerMutation.isPending}
       />
     </DashboardLayout>
   );

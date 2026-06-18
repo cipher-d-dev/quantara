@@ -66,18 +66,33 @@ export interface Database {
           id: string;
           user_id: string;
           course_id: string;
+          package_type: 'basic' | 'pro';
+          delivery_location: string;
+          payment_reference: string | null;
+          payment_status: 'pending' | 'paid' | 'failed';
+          amount_kobo: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           course_id: string;
+          package_type?: 'basic' | 'pro';
+          delivery_location?: string;
+          payment_reference?: string | null;
+          payment_status?: 'pending' | 'paid' | 'failed';
+          amount_kobo?: number;
           created_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
           course_id?: string;
+          package_type?: 'basic' | 'pro';
+          delivery_location?: string;
+          payment_reference?: string | null;
+          payment_status?: 'pending' | 'paid' | 'failed';
+          amount_kobo?: number;
           created_at?: string;
         };
       };
@@ -91,6 +106,7 @@ export interface Database {
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Course = Database['public']['Tables']['courses']['Row'];
 export type Registration = Database['public']['Tables']['registrations']['Row'];
+export type RegistrationPackage = Registration['package_type'];
 
 export type CourseWithSlots = Course & {
   registered_count: number;

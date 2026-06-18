@@ -49,6 +49,11 @@ async function getAllRegistrations() {
       `
       id,
       created_at,
+      package_type,
+      delivery_location,
+      payment_reference,
+      payment_status,
+      amount_kobo,
       user:profiles (id, full_name, email),
       course:courses (id, code, title)
     `
@@ -58,9 +63,9 @@ async function getAllRegistrations() {
   if (error) throw error;
 
   return (data as unknown) as (Registration & {
-  user: Pick<Profile, 'id' | 'full_name' | 'email'>;
-  course: Pick<Course, 'id' | 'code' | 'title'>;
-})[];
+    user: Pick<Profile, 'id' | 'full_name' | 'email'>;
+    course: Pick<Course, 'id' | 'code' | 'title'>;
+  })[];
 }
 
 async function createCourse(

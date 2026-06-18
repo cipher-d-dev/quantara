@@ -1,33 +1,28 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import {
-  Users,
-  Calendar,
-  TrendingUp,
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-} from 'lucide-react';
+import { Calendar, Pencil, Plus, Search, Trash2, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   useAdminStats,
   useAllCourses,
+  useAllRegistrations,
   useDeleteCourse,
 } from '../hooks';
 import { useToast } from '../contexts/ToastContext';
 import { DashboardLayout } from '../components/layout';
 import {
-  Card,
   Badge,
   Button,
-  TableSkeleton,
+  Card,
   ConfirmModal,
   EmptyState,
+  Modal,
+  TableSkeleton,
 } from '../components/ui';
 import { CourseModal } from '../components/CourseModal';
 import type { Course } from '../types/database';
-import Logo from "../components/ui/Logo";
+import { formatNaira } from '../lib/packages';
+import Logo from '../components/ui/Logo';
 
 export function AdminDashboard() {
   const { user } = useAuth();
@@ -38,9 +33,11 @@ export function AdminDashboard() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [registrationsCourse, setRegistrationsCourse] = useState<Course | null>(null);
 
   const { data: stats } = useAdminStats();
   const { data: courses, isLoading: coursesLoading } = useAllCourses();
+  const { data: allRegistrations, isLoading: registrationsLoading } = useAllRegistrations();
   const deleteMutation = useDeleteCourse();
 
   if (!user || user.role !== 'admin') {
@@ -52,6 +49,10 @@ export function AdminDashboard() {
       course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const courseRegistrations =
+    allRegistrations?.filter((registration) => registration.course.id === registrationsCourse?.id) ||
+    [];
 
   const handleEdit = (course: Course) => {
     setSelectedCourse(course);
@@ -85,7 +86,7 @@ export function AdminDashboard() {
               Admin Dashboard
             </h1>
             <p className="text-surface-500 dark:text-surface-400 mt-1">
-              Manage courses, slot capacity, and registrations.
+              Manage courses, slot capacity, payments, and registrations.
             </p>
           </div>
           <Button onClick={() => setShowCreateModal(true)} icon={<Plus className="w-4 h-4" />}>
@@ -159,7 +160,7 @@ export function AdminDashboard() {
                   Course Management
                 </h2>
                 <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                  Create courses, set slot limits, and control registration windows
+                  Open a course to view students and payment details.
                 </p>
               </div>
               <div className="relative">
@@ -201,19 +202,19 @@ export function AdminDashboard() {
               <table className="w-full">
                 <thead className="bg-surface-50 dark:bg-surface-850">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
                       Course
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
                       Slots
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
                       Created
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
                       Actions
                     </th>
                   </tr>
@@ -225,14 +226,12 @@ export function AdminDashboard() {
                       className="hover:bg-surface-50 dark:hover:bg-surface-850 transition-colors"
                     >
                       <td className="px-6 py-4">
-                        <div>
-                          <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 mb-1">
-                            {course.code}
-                          </span>
-                          <p className="text-sm font-medium text-surface-900 dark:text-surface-100">
-                            {course.title}
-                          </p>
-                        </div>
+                        <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 mb-1">
+                          {course.code}
+                        </span>
+                        <p className="text-sm font-medium text-surface-900 dark:text-surface-100">
+                          {course.title}
+                        </p>
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant={course.registration_open ? 'success' : 'error'}>
@@ -247,6 +246,16 @@ export function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRegistrationsCourse(course)}
+                            className="p-2 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/50"
+                            aria-label={`View registrations for ${course.title}`}
+                            title="View registrations"
+                          >
+                            <Users className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -278,7 +287,6 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Modals */}
       <CourseModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
 
       <CourseModal
@@ -303,6 +311,79 @@ export function AdminDashboard() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+
+      <Modal
+        isOpen={!!registrationsCourse}
+        onClose={() => setRegistrationsCourse(null)}
+        title={`Registrations: ${registrationsCourse?.code ?? ''}`}
+        description={`Students registered for ${registrationsCourse?.title ?? 'this course'}`}
+        size="xl"
+      >
+        {registrationsLoading ? (
+          <TableSkeleton rows={4} />
+        ) : courseRegistrations.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="w-12 h-12 text-surface-300 dark:text-surface-700 mx-auto mb-4" />
+            <p className="text-surface-500 dark:text-surface-400">
+              No students registered yet for this course.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto pr-1">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-surface-200 dark:border-surface-800 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
+                  <th className="pb-3 pr-4">Student</th>
+                  <th className="pb-3 px-4">Package</th>
+                  <th className="pb-3 px-4">Delivery</th>
+                  <th className="pb-3 px-4">Payment</th>
+                  <th className="pb-3 pl-4 text-right">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-200 dark:divide-surface-800 text-sm">
+                {courseRegistrations.map((registration) => (
+                  <tr key={registration.id} className="text-surface-900 dark:text-surface-100">
+                    <td className="py-3 pr-4">
+                      <p className="font-medium">{registration.user?.full_name || 'Unknown User'}</p>
+                      <p className="text-xs text-surface-500 dark:text-surface-400">
+                        {registration.user?.email || 'No email'}
+                      </p>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant={registration.package_type === 'pro' ? 'info' : 'default'}>
+                        {registration.package_type}
+                      </Badge>
+                    </td>
+                    <td
+                      className="py-3 px-4 text-xs text-surface-600 dark:text-surface-400 max-w-[180px] truncate"
+                      title={registration.delivery_location}
+                    >
+                      {registration.delivery_location}
+                    </td>
+                    <td className="py-3 px-4">
+                      <p className="font-semibold text-xs">
+                        {formatNaira(registration.amount_kobo)}
+                      </p>
+                      <p className="text-[10px] capitalize text-surface-500 dark:text-surface-400">
+                        {registration.payment_status}
+                      </p>
+                      <p
+                        className="text-[10px] text-surface-500 dark:text-surface-400 truncate max-w-[120px]"
+                        title={registration.payment_reference || ''}
+                      >
+                        Ref: {registration.payment_reference || 'N/A'}
+                      </p>
+                    </td>
+                    <td className="py-3 pl-4 text-right text-xs text-surface-500 dark:text-surface-400">
+                      {new Date(registration.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
     </DashboardLayout>
   );
 }

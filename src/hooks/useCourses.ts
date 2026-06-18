@@ -49,6 +49,11 @@ async function getMyRegistrations(userId: string) {
     .select(
       `
       id,
+      package_type,
+      delivery_location,
+      payment_reference,
+      payment_status,
+      amount_kobo,
       created_at,
       course:courses (*)
     `
@@ -64,13 +69,26 @@ async function getMyRegistrations(userId: string) {
       id: row.id,
       user_id: userId,
       course_id: course.id,
+      package_type: row.package_type,
+      delivery_location: row.delivery_location,
+      payment_reference: row.payment_reference,
+      payment_status: row.payment_status,
+      amount_kobo: row.amount_kobo,
       created_at: row.created_at,
       course,
     };
   });
 }
 
-async function registerForCourse(userId: string, courseId: string) {
+async function registerForCourse(
+  userId: string,
+  courseId: string,
+  packageType: 'basic' | 'pro' = 'basic',
+  deliveryLocation: string = 'The Engineering Civil Shed',
+  paymentReference: string | null = null,
+  paymentStatus: 'pending' | 'paid' | 'failed' = 'paid',
+  amountKobo: number = 0
+) {
   const { data: course } = await supabase
     .from('courses')
     .select('max_slots, registration_open')
@@ -92,6 +110,11 @@ async function registerForCourse(userId: string, courseId: string) {
   const { error } = await supabase.from('registrations').insert({
     user_id: userId,
     course_id: courseId,
+    package_type: packageType,
+    delivery_location: deliveryLocation,
+    payment_reference: paymentReference,
+    payment_status: paymentStatus,
+    amount_kobo: amountKobo,
   });
 
   if (error) {
@@ -160,12 +183,38 @@ export function useRegisterForCourse() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ userId, courseId }: { userId: string; courseId: string }) =>
-      registerForCourse(userId, courseId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['courses'] });
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
     },
+    mutationFn: ({
+      userId,
+      courseId,
+      packageType,
+      deliveryLocation,
+      paymentReference,
+      paymentStatus,
+      amountKobo,
+    }: {
+      userId: string;
+      courseId: string;
+      packageType?: 'basic' | 'pro';
+      deliveryLocation?: string;
+      paymentReference?: string | null;
+      paymentStatus?: 'pending' | 'paid' | 'failed';
+      amountKobo?: number;
+    }) =>
+      registerForCourse(
+        userId,
+        courseId,
+        packageType,
+        deliveryLocation,
+        paymentReference,
+        paymentStatus,
+        amountKobo
+      ),
   });
 }
 
@@ -177,6 +226,8 @@ export function useUnregisterFromCourse() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['courses'] });
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
     },
   });
 }

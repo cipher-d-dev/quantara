@@ -11,6 +11,7 @@ import {
   AdminDashboard,
   CourseCatalogPage,
   SettingsPage,
+  PaymentCallbackPage,
 } from './pages';
 import { Skeleton } from './components/ui';
 
@@ -288,6 +289,14 @@ function AppRoutes() {
         }
       />
       <Route path="/courses" element={<CourseCatalogPage />} />
+      <Route
+        path="/payment/callback"
+        element={
+          <ProtectedRoute>
+            <PaymentCallbackPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard"
         element={
