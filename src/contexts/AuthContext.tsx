@@ -60,50 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error || !data) {
-        // Fallback: If profile doesn't exist in profiles table (e.g. trigger delay/error/missing), create it client-side
-        if ((!error || error.code === 'PGRST116') && sessionUser) {
-          const fullName = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || 'New User';
-          const email = sessionUser.email || '';
-
-          const { data: newProfile, error: insertError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: userId,
-              full_name: fullName,
-              email: email,
-            }, { onConflict: 'id' })
-            .select()
-            .single();
-
-          if (insertError) {
-            const { data: existingProfile, error: refetchError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', userId)
-              .single();
-
-            if (!refetchError && existingProfile) {
-              applyProfile(existingProfile);
-              return;
-            }
-
-            throw insertError;
-          }
-
-          if (newProfile) {
-            applyProfile(newProfile);
-            return;
-          }
-        }
-        throw error ?? new Error('Profile not found for authenticated user');
+      if (error) {
+        throw error;
       }
 
-      if (data) {
-        applyProfile(data);
+      if (!data) {
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+
+      applyProfile(data);
+    } catch {
       if (sessionUser) {
         applySessionUserFallback(sessionUser);
       } else {
@@ -121,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function initializeAuth() {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
+
         if (!mounted) return;
 
         if (initialSession) {
@@ -136,8 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfileLoading(false);
           setLoading(false);
         }
-      } catch (err) {
-        console.error('Error initializing auth:', err);
+      } catch {
         if (mounted) {
           setSession(null);
           setUser(null);
@@ -257,6 +222,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
 
       const { data: { user: sessionUser } } = await supabase.auth.getUser();
+
+      if (!sessionUser) {
+        throw new Error('User not authenticated');
+      }
+      if (sessionUser.id !== user.id) {
+        throw new Error('Auth (User ID) mismatch');
+      }
       await fetchProfile(user.id, sessionUser ?? undefined);
       return { error: null };
     } catch (error) {

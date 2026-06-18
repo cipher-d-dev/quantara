@@ -16,10 +16,27 @@
   body {
     @apply bg-surface-0 text-surface-900 font-sans;
     overflow-x: hidden;
+    line-height: 1.5;
+    letter-spacing: 0;
+    font-kerning: normal;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   }
 
   .dark body {
     @apply bg-surface-950 text-surface-100;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  button,
+  input,
+  textarea,
+  select {
+    letter-spacing: 0;
   }
 
   /* Custom scrollbar */

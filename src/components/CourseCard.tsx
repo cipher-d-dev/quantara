@@ -31,11 +31,9 @@ export function CourseCard({
     if (!animate || !cardRef.current) return;
 
     gsap.from(cardRef.current, {
-      opacity: 0,
-      y: 30,
-      scale: 0.97,
-      duration: 0.6,
-      ease: 'power3.out',
+      y: 8,
+      duration: 0.24,
+      ease: 'power2.out',
     });
   }, [animate]);
 
@@ -65,19 +63,13 @@ export function CourseCard({
       ref={cardRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="group relative p-6 rounded-3xl bg-surface-0 dark:bg-surface-900 border border-surface-200/60 dark:border-surface-800/60 hover:border-brand-300/50 dark:hover:border-brand-700/50 transition-colors duration-200 overflow-hidden cursor-pointer"
+      className="group relative p-5 rounded-2xl bg-surface-0 dark:bg-surface-900 border border-surface-200/70 dark:border-surface-800/70 hover:border-brand-300/50 dark:hover:border-brand-700/50 transition-colors duration-200 overflow-hidden cursor-pointer"
       style={{ willChange: 'transform' }}
     >
-      {/* Gradient background on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-brand-500/0 via-brand-500/0 to-brand-600/0 group-hover:from-brand-500/3 group-hover:via-brand-500/2 group-hover:to-brand-600/3 transition-all duration-500" />
-
-      {/* Shine effect */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-        <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 skew-x-12" />
-      </div>
+      <div className="absolute inset-0 bg-brand-500/0 group-hover:bg-brand-500/[0.025] transition-colors duration-200" />
 
       <div className="relative z-10">
-        <div className="flex items-start justify-between mb-5">
+        <div className="flex items-start justify-between mb-4">
           <Badge
             variant={course.registration_open ? 'success' : 'error'}
             size="md"
@@ -93,14 +85,14 @@ export function CourseCard({
           )}
         </div>
 
-        <div className="mb-5">
+        <div className="mb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 mb-3">
             <Calendar className="w-3.5 h-3.5 text-brand-500" />
-            <span className="text-xs font-bold text-surface-600 dark:text-surface-400 uppercase tracking-wider">
+            <span className="text-xs font-bold text-surface-600 dark:text-surface-300 uppercase">
               {course.code}
             </span>
           </div>
-          <h3 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2 line-clamp-1">
+          <h3 className="text-base font-bold text-surface-900 dark:text-surface-100 mb-2 line-clamp-1">
             {course.title}
           </h3>
           {course.description && (
@@ -110,7 +102,7 @@ export function CourseCard({
           )}
         </div>
 
-        <div className="flex items-center gap-5 text-sm text-surface-500 dark:text-surface-400 mb-5">
+        <div className="flex items-center gap-5 text-sm text-surface-600 dark:text-surface-300 mb-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
               <Users className="w-4 h-4" />

@@ -169,7 +169,7 @@ export function AdminDashboard() {
                   placeholder="Search courses..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full sm:w-64 h-10 pl-10 pr-4 rounded-xl bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full sm:w-64 h-10 pl-10 pr-4 rounded-xl bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
                 />
               </div>
             </div>
@@ -252,6 +252,8 @@ export function AdminDashboard() {
                             size="sm"
                             onClick={() => handleEdit(course)}
                             className="p-2"
+                            aria-label={`Edit ${course.title}`}
+                            title="Edit course"
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -260,6 +262,8 @@ export function AdminDashboard() {
                             size="sm"
                             onClick={() => handleDelete(course)}
                             className="p-2 text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-950/50"
+                            aria-label={`Delete ${course.title}`}
+                            title="Delete course"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

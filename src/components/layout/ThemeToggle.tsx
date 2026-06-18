@@ -36,41 +36,31 @@ export default function ThemeToggle() {
       ref={buttonRef}
       onClick={handleClick}
       disabled={isTransitioning}
-      className="relative w-10 h-10 rounded-xl bg-surface-100/80 dark:bg-surface-800/80 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors duration-300 flex items-center justify-center group overflow-hidden"
+      className="relative w-10 h-10 rounded-xl bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700 text-surface-800 dark:text-surface-100 transition-colors duration-200 flex items-center justify-center group overflow-hidden disabled:cursor-not-allowed"
       aria-label="Toggle theme"
     >
-      {/* Background glow */}
-      <div
-        className={`absolute inset-0 transition-opacity duration-500 ${
-          resolvedTheme === 'dark'
-            ? 'bg-gradient-to-br from-yellow-400/0 via-yellow-400/0 to-orange-500/0'
-            : 'bg-gradient-to-br from-brand-500/0 via-brand-500/0 to-brand-600/0'
-        }`}
-      />
-
-      {/* Icons */}
       <div
         ref={iconRef}
-        className="relative"
+        className="relative w-5 h-5"
         style={{ transformStyle: 'preserve-3d' }}
       >
         <div
-          className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${
+          className={`absolute inset-0 flex items-center justify-center transition-transform duration-300 ${
             resolvedTheme === 'dark'
               ? 'opacity-100 rotate-0'
-              : 'opacity-0 rotate-90 absolute'
+              : 'opacity-0 rotate-90'
           }`}
         >
-          <Sun className="w-5 h-5 text-yellow-500 group-hover:text-yellow-400 transition-colors" />
+          <Sun className="w-5 h-5 text-amber-500 dark:text-amber-300" />
         </div>
         <div
-          className={`flex items-center justify-center transition-all duration-500 ${
+          className={`absolute inset-0 flex items-center justify-center transition-transform duration-300 ${
             resolvedTheme === 'light'
               ? 'opacity-100 rotate-0'
-              : 'opacity-0 -rotate-90 absolute'
+              : 'opacity-0 -rotate-90'
           }`}
         >
-          <Moon className="w-5 h-5 text-brand-500 dark:text-brand-400 group-hover:text-brand-400 dark:group-hover:text-brand-300 transition-colors" />
+          <Moon className="w-5 h-5 text-brand-600 dark:text-brand-300" />
         </div>
       </div>
 

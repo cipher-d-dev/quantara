@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input, Button, Toggle, Modal } from '../components/ui';
 import { useCreateCourse, useUpdateCourse } from '../hooks';
 import { useToast } from '../contexts/ToastContext';
@@ -23,6 +23,17 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
   const toast = useToast();
 
   const isEditing = !!course;
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setCode(course?.code || '');
+    setTitle(course?.title || '');
+    setDescription(course?.description || '');
+    setMaxSlots(course?.max_slots?.toString() || '30');
+    setRegistrationOpen(course?.registration_open ?? true);
+    setErrors({});
+  }, [course, isOpen]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -69,8 +80,8 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
       description={isEditing ? 'Update course details and settings.' : 'Add a new course to the catalog.'}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Course Code"
             value={code}
@@ -105,7 +116,7 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief description of the course..."
             rows={3}
-            className="w-full px-3 py-2 rounded-xl bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none"
+            className="w-full min-h-24 px-3.5 py-2.5 rounded-xl bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none transition-colors"
           />
         </div>
 
@@ -116,7 +127,7 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
           onChange={(e) => setRegistrationOpen(e.target.checked)}
         />
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-surface-200 dark:border-surface-800">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-5 border-t border-surface-200 dark:border-surface-800">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>

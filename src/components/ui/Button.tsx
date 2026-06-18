@@ -15,17 +15,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-600 text-white shadow-lg shadow-brand-600/25 hover:shadow-xl hover:shadow-brand-600/30 hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:shadow-brand-500/20 dark:hover:bg-brand-600',
+    'bg-brand-600 text-white shadow-sm hover:shadow-md hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:hover:bg-brand-600',
   secondary:
-    'bg-surface-100 text-surface-900 hover:bg-surface-200 active:bg-surface-300 dark:bg-surface-800/80 dark:text-surface-100 dark:hover:bg-surface-700 shadow-sm hover:shadow-md',
+    'bg-surface-100 text-surface-900 hover:bg-surface-200 active:bg-surface-300 dark:bg-surface-800/80 dark:text-surface-100 dark:hover:bg-surface-700',
   ghost:
-    'bg-transparent text-surface-600 hover:bg-surface-100 hover:text-surface-900 active:bg-surface-200 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100',
+    'bg-transparent text-surface-700 hover:bg-surface-100 hover:text-surface-950 active:bg-surface-200 dark:text-surface-200 dark:hover:bg-surface-800 dark:hover:text-white',
   danger:
-    'bg-error-600 text-white shadow-lg shadow-error-600/25 hover:shadow-xl hover:shadow-error-600/30 hover:bg-error-700 active:bg-error-800',
+    'bg-error-600 text-white shadow-sm hover:shadow-md hover:bg-error-700 active:bg-error-800',
   outline:
-    'border-2 border-surface-200 bg-transparent text-surface-700 hover:bg-surface-50 hover:border-surface-300 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-800/50 dark:hover:border-surface-600',
+    'border border-surface-200 bg-transparent text-surface-800 hover:bg-surface-50 hover:border-surface-300 dark:border-surface-700 dark:text-surface-100 dark:hover:bg-surface-800/50 dark:hover:border-surface-600',
   gradient:
-    'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-600/25 hover:shadow-xl hover:shadow-brand-500/30 hover:from-brand-700 hover:to-brand-600 active:from-brand-800 active:to-brand-700',
+    'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-sm hover:shadow-md hover:from-brand-700 hover:to-brand-600 active:from-brand-800 active:to-brand-700',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -94,7 +94,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         }}
         className={`
           relative inline-flex items-center justify-center font-semibold
-          transition-all duration-300 ease-out
+          transition-colors duration-200 ease-out
           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-surface-950
           disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none
           cursor-pointer
@@ -107,11 +107,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         {...props}
       >
-        {/* Shine effect for gradient variant */}
-        {variant === 'gradient' && (
-          <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
-        )}
-
         <span className="relative inline-flex items-center justify-center gap-inherit">
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           {!loading && icon && iconPosition === 'left' && (

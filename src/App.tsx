@@ -247,7 +247,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { session, user, loading, profileLoading } = useAuth();
   const location = useLocation();
-  console.log(user)
 
   if (loading) return <LoadingScreen />;
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />;

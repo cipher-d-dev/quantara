@@ -46,35 +46,11 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // Calculate rotation based on mouse position
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const rotateX = (y - centerY) / 20;
-      const rotateY = (centerX - x) / 20;
-
-      gsap.to(card, {
-        rotateX: -rotateX,
-        rotateY: rotateY,
-        duration: 0.3,
-        ease: 'power2.out',
-        transformPerspective: 1000,
-      });
-
-      // Update glow position
       card.style.setProperty('--mouse-x', `${x}px`);
       card.style.setProperty('--mouse-y', `${y}px`);
     };
 
     const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!hover || !cardRef.current) return;
-
-      gsap.to(cardRef.current, {
-        rotateX: 0,
-        rotateY: 0,
-        duration: 0.5,
-        ease: 'power2.out',
-      });
-
       onMouseLeave?.(e);
     };
 
@@ -94,14 +70,13 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
             : 'bg-surface-0 dark:bg-surface-900 border-surface-200/60 dark:border-surface-800/60'
           }
           ${hover
-            ? 'transition-shadow duration-300 hover:shadow-xl hover:shadow-brand-500/5 dark:hover:shadow-brand-500/10'
+            ? 'transition-colors duration-200 hover:border-brand-300/40 dark:hover:border-brand-700/40'
             : 'shadow-sm'
           }
           ${paddingStyles[padding]}
           ${className}
         `}
         style={{
-          transformStyle: hover ? 'preserve-3d' : undefined,
           '--mouse-x': '0px',
           '--mouse-y': '0px',
         } as React.CSSProperties}
@@ -110,7 +85,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
         onMouseLeave={handleMouseLeave}
         {...props}
       >
-        {/* Gradient border effect on hover */}
+        {/* Subtle pointer wash for dense admin surfaces. */}
         {hover && (
           <div
             className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 pointer-events-none group-hover:opacity-100"

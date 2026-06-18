@@ -114,7 +114,7 @@ export function Modal({
           className={`
             w-full ${sizeStyles[size]} pointer-events-auto
             bg-surface-0 dark:bg-surface-900
-            rounded-3xl shadow-2xl
+            rounded-2xl shadow-xl shadow-surface-950/10 dark:shadow-surface-950/40
             border border-surface-200/80 dark:border-surface-800/80
             overflow-hidden
           `}
