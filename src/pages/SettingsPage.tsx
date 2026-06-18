@@ -7,7 +7,7 @@ import { DashboardLayout } from '../components/layout';
 import { Button, Input, Card, Badge } from '../components/ui';
 
 export function SettingsPage() {
-  const { user, updateProfile } = useAuth();
+  const { user, profile, profileLoading, updateProfile } = useAuth();
   const toast = useToast();
   const [fullName, setFullName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -63,7 +63,7 @@ export function SettingsPage() {
                 <p className="text-sm text-surface-500 dark:text-surface-400">{user.email}</p>
                 <Badge variant="info" size="sm" className="mt-2 capitalize">
                   <Shield className="w-3 h-3" />
-                  {user.role}
+                  {profileLoading && !profile ? 'Loading' : profile?.role ?? user.role}
                 </Badge>
               </div>
             </div>

@@ -8,7 +8,8 @@ interface AuthContextType {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  profileLoading: boolean;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ data: any; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -23,50 +24,150 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const applyProfile = useCallback((data: Profile) => {
+    setProfile(data);
+    setUser({
+      id: data.id,
+      email: data.email,
+      full_name: data.full_name,
+      role: data.role,
+    });
+  }, []);
+
+  const applySessionUserFallback = useCallback((sessionUser: Session['user']) => {
+    setProfile(null);
+    setUser({
+      id: sessionUser.id,
+      email: sessionUser.email ?? '',
+      full_name:
+        sessionUser.user_metadata?.full_name ||
+        sessionUser.user_metadata?.name ||
+        sessionUser.email ||
+        'New User',
+      role: 'student',
+    });
+  }, []);
+
+  const fetchProfile = useCallback(async (userId: string, sessionUser?: any) => {
+    setProfileLoading(true);
+
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error || !data) {
+        // Fallback: If profile doesn't exist in profiles table (e.g. trigger delay/error/missing), create it client-side
+        if ((!error || error.code === 'PGRST116') && sessionUser) {
+          const fullName = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || 'New User';
+          const email = sessionUser.email || '';
+
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: userId,
+              full_name: fullName,
+              email: email,
+            }, { onConflict: 'id' })
+            .select()
+            .single();
+
+          if (insertError) {
+            const { data: existingProfile, error: refetchError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
+
+            if (!refetchError && existingProfile) {
+              applyProfile(existingProfile);
+              return;
+            }
+
+            throw insertError;
+          }
+
+          if (newProfile) {
+            applyProfile(newProfile);
+            return;
+          }
+        }
+        throw error ?? new Error('Profile not found for authenticated user');
+      }
 
       if (data) {
-        setProfile(data);
-        setUser({
-          id: data.id,
-          email: data.email,
-          full_name: data.full_name,
-          role: data.role,
-        });
+        applyProfile(data);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      setUser(null);
-      setProfile(null);
+      if (sessionUser) {
+        applySessionUserFallback(sessionUser);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    } finally {
+      setProfileLoading(false);
     }
-  }, []);
+  }, [applyProfile, applySessionUserFallback]);
 
   useEffect(() => {
     let mounted = true;
 
+    async function initializeAuth() {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+
+        if (initialSession) {
+          setSession(initialSession);
+          applySessionUserFallback(initialSession.user);
+          setLoading(false);
+          void fetchProfile(initialSession.user.id, initialSession.user);
+        } else {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setProfileLoading(false);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setProfileLoading(false);
+          setLoading(false);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    initializeAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      (_event, newSession) => {
         if (!mounted) return;
 
         setSession(newSession);
 
         if (newSession?.user) {
-          await fetchProfile(newSession.user.id);
+          applySessionUserFallback(newSession.user);
+          setLoading(false);
+          void fetchProfile(newSession.user.id, newSession.user);
         } else {
           setUser(null);
           setProfile(null);
+          setProfileLoading(false);
+          setLoading(false);
         }
-
-        setLoading(false);
       }
     );
 
@@ -74,23 +175,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [applySessionUserFallback, fetchProfile]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: `${window.location.origin}/login`,
         },
       });
 
-      return { error: error as Error | null };
+      return { data, error: error as Error | null };
     } catch (error) {
-      return { error: error as Error };
+      return { data: null, error: error as Error };
     }
   };
 
@@ -154,7 +256,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      await fetchProfile(user.id);
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      await fetchProfile(user.id, sessionUser ?? undefined);
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -168,6 +271,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         session,
         loading,
+        profileLoading,
         signUp,
         signIn,
         signInWithGoogle,

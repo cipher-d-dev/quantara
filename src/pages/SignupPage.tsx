@@ -106,11 +106,19 @@ export function SignupPage() {
 
     setLoading(true);
 
-    const { error } = await signUp(email, password, fullName);
+    const { data, error } = await signUp(email, password, fullName);
 
     if (error) {
       toast.error('Sign up failed', error.message);
       setLoading(false);
+      return;
+    }
+
+    // Check if email confirmation is required (session is null on signUp response)
+    if (data && !data.session) {
+      toast.success('Registration successful!', 'Please check your email for a verification link to confirm your account.');
+      setLoading(false);
+      navigate('/login');
       return;
     }
 
@@ -144,9 +152,7 @@ export function SignupPage() {
         <div className="w-full max-w-md" ref={cardRef}>
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-3 mb-8 group cursor-pointer">
-              <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 flex items-center justify-center shadow-xl shadow-brand-500/30 group-hover:shadow-2xl group-hover:shadow-brand-500/40 transition-all duration-300 group-hover:scale-105">
-                <Logo />
-              </div>
+              <Logo />
             </Link>
             <h1 className="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-surface-100 mb-2">
               Create your account
@@ -156,7 +162,7 @@ export function SignupPage() {
             </p>
           </div>
 
-          <Card padding="lg" className="shadow-2xl border-surface-200/60 dark:border-surface-800/60">
+          <Card padding="lg" className="shadow-2 xl border-surface-200/60 dark:border-surface-800/60">
             <div className="space-y-6">
               <Button
                 variant="outline"
@@ -215,18 +221,15 @@ export function SignupPage() {
                       {passwordRequirements.map((req, i) => (
                         <div
                           key={i}
-                          className={`flex items-center gap-2.5 text-xs transition-all duration-300 ${
-                            req.met
+                          className={`flex items-center gap-2.5 text-xs transition-all duration-300 ${req.met
                               ? 'text-success-600 dark:text-success-400'
                               : 'text-surface-400 dark:text-surface-500'
-                          }`}
+                            }`}
                         >
-                          <div className={`w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300 ${
-                            req.met ? 'bg-success-100 dark:bg-success-950' : 'bg-surface-100 dark:bg-surface-800'
-                          }`}>
-                            <CheckCircle2 className={`w-3.5 h-3.5 transition-all duration-300 ${
-                              req.met ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-                            }`} />
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300 ${req.met ? 'bg-success-100 dark:bg-success-950' : 'bg-surface-100 dark:bg-surface-800'
+                            }`}>
+                            <CheckCircle2 className={`w-3.5 h-3.5 transition-all duration-300 ${req.met ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+                              }`} />
                           </div>
                           <span>{req.text}</span>
                         </div>
