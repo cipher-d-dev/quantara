@@ -3,7 +3,11 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { useRegisterForCourse } from '../hooks';
+import {
+  useHasRegistration,
+  useHasRegistrationForPaymentReference,
+  useRegisterForCourse,
+} from '../hooks';
 import {
   clearPendingRegistration,
   loadPendingRegistration,
@@ -17,6 +21,8 @@ export function PaymentCallbackPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const registerMutation = useRegisterForCourse();
+  const hasRegistrationMutation = useHasRegistration();
+  const hasPaymentReferenceMutation = useHasRegistrationForPaymentReference();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
@@ -24,7 +30,7 @@ export function PaymentCallbackPage() {
   const reference = searchParams.get('reference') || searchParams.get('trxref');
 
   useEffect(() => {
-    if (loading || !user || !reference || startedRef.current) return;
+    if (loading || !user?.id || !reference || startedRef.current) return;
     startedRef.current = true;
 
     let cancelled = false;
@@ -41,35 +47,69 @@ export function PaymentCallbackPage() {
         const metadata = verification.metadata ?? {};
 
         const courseId =
-          pending?.courseId || (metadata.course_id as string | undefined);
+          pending?.courseId ||
+          (metadata.courseId as string | undefined) ||
+          (metadata.course_id as string | undefined);
         const packageType =
           pending?.packageType ||
+          (metadata.packageType as RegistrationPackage | undefined) ||
           (metadata.package_type as RegistrationPackage | undefined);
         const deliveryLocation =
           pending?.deliveryLocation ||
+          (metadata.deliveryLocation as string | undefined) ||
           (metadata.delivery_location as string | undefined);
-        const amountKobo = pending?.amountKobo ?? verification.amount ?? 0;
+        const amountKobo = pending?.amountKobo ?? verification.amountKobo ?? verification.amount ?? 0;
         const returnPath = pending?.returnPath || '/dashboard';
+        const paymentReference = verification.reference || reference!;
 
         if (!courseId || !packageType || !deliveryLocation) {
           throw new Error('Registration details were not found after payment');
         }
 
-        if (amountKobo > 0 && verification.amount && verification.amount !== amountKobo) {
+        const verifiedAmount = verification.amountKobo ?? verification.amount;
+        if (amountKobo > 0 && verifiedAmount && verifiedAmount !== amountKobo) {
           throw new Error('Paid amount does not match the selected package');
         }
 
-        await registerMutation.mutateAsync({
-          userId: user!.id,
-          courseId,
-          packageType,
-          deliveryLocation,
-          paymentReference: verification.reference || reference!,
-          paymentStatus: 'paid',
-          amountKobo,
-        });
+        if (!verification.dbRegistered) {
+          const paymentAlreadySaved =
+            paymentReference &&
+            (await hasPaymentReferenceMutation.mutateAsync(paymentReference));
 
-        if (cancelled) return;
+          if (paymentAlreadySaved) {
+            clearPendingRegistration();
+            toast.success('Payment confirmed and registration saved');
+            navigate(returnPath, { replace: true });
+            return;
+          }
+
+          try {
+            await registerMutation.mutateAsync({
+              userId: user!.id,
+              courseId,
+              packageType,
+              deliveryLocation,
+              paymentReference,
+              paymentStatus: 'paid',
+              amountKobo,
+            });
+          } catch (registrationError) {
+            const message = (registrationError as Error).message.toLowerCase();
+            const alreadyRegistered =
+              message.includes('already registered') ||
+              message.includes('duplicate') ||
+              message.includes('conflict');
+
+            if (!alreadyRegistered) throw registrationError;
+
+            const exists = await hasRegistrationMutation.mutateAsync({
+              userId: user!.id,
+              courseId,
+            });
+
+            if (!exists) throw registrationError;
+          }
+        }
 
         clearPendingRegistration();
         toast.success('Payment confirmed and registration saved');
@@ -86,7 +126,7 @@ export function PaymentCallbackPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when auth + reference are ready
-  }, [loading, user, reference]);
+  }, [loading, user?.id, reference]);
 
   if (!loading && !user) {
     return <Navigate to="/login" replace state={{ from: '/payment/callback' }} />;

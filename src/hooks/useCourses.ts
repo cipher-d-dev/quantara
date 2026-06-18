@@ -89,6 +89,27 @@ async function registerForCourse(
   paymentStatus: 'pending' | 'paid' | 'failed' = 'paid',
   amountKobo: number = 0
 ) {
+  if (paymentReference) {
+    const { data: existingPaymentRegistration, error: existingPaymentError } = await supabase
+      .from('registrations')
+      .select('id')
+      .eq('payment_reference', paymentReference)
+      .maybeSingle();
+
+    if (existingPaymentError) throw existingPaymentError;
+    if (existingPaymentRegistration) return;
+  }
+
+  const { data: existingRegistration, error: existingError } = await supabase
+    .from('registrations')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existingRegistration) return;
+
   const { data: course } = await supabase
     .from('courses')
     .select('max_slots, registration_open')
@@ -107,22 +128,51 @@ async function registerForCourse(
     throw new Error('No slots available');
   }
 
-  const { error } = await supabase.from('registrations').insert({
-    user_id: userId,
-    course_id: courseId,
-    package_type: packageType,
-    delivery_location: deliveryLocation,
-    payment_reference: paymentReference,
-    payment_status: paymentStatus,
-    amount_kobo: amountKobo,
-  });
+  const { error } = await supabase.from('registrations').upsert(
+    {
+      user_id: userId,
+      course_id: courseId,
+      package_type: packageType,
+      delivery_location: deliveryLocation,
+      payment_reference: paymentReference,
+      payment_status: paymentStatus,
+      amount_kobo: amountKobo,
+    },
+    {
+      onConflict: 'user_id,course_id',
+      ignoreDuplicates: true,
+    }
+  );
 
   if (error) {
-    if (error.code === '23505') {
-      throw new Error('You are already registered for this course');
+    if (error.code === '23505' || error.message.toLowerCase().includes('duplicate')) {
+      return;
     }
     throw error;
   }
+}
+
+async function hasRegistration(userId: string, courseId: string) {
+  const { data, error } = await supabase
+    .from('registrations')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return !!data;
+}
+
+async function hasRegistrationForPaymentReference(paymentReference: string) {
+  const { data, error } = await supabase
+    .from('registrations')
+    .select('id')
+    .eq('payment_reference', paymentReference)
+    .maybeSingle();
+
+  if (error) throw error;
+  return !!data;
 }
 
 async function unregisterFromCourse(registrationId: string) {
@@ -229,5 +279,18 @@ export function useUnregisterFromCourse() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'registrations'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
     },
+  });
+}
+
+export function useHasRegistration() {
+  return useMutation({
+    mutationFn: ({ userId, courseId }: { userId: string; courseId: string }) =>
+      hasRegistration(userId, courseId),
+  });
+}
+
+export function useHasRegistrationForPaymentReference() {
+  return useMutation({
+    mutationFn: (paymentReference: string) => hasRegistrationForPaymentReference(paymentReference),
   });
 }

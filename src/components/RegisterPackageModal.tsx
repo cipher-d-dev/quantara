@@ -13,6 +13,11 @@ import {
   PACKAGE_OPTIONS,
   UNILAG_DELIVERY_LOCATIONS,
 } from '../lib/packages';
+import {
+  clearPendingRegistration,
+  initializePaystackCheckout,
+  savePendingRegistration,
+} from '../lib/paystack';
 interface RegisterPackageModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -92,35 +97,27 @@ export function RegisterPackageModal({
     setPaying(true);
 
     try {
-      // Initialize transaction securely on backend Express server
-      const serverUrl = import.meta.env.VITE_SERVER_URL || '';
-      // We pass the current URL pathname so the user is redirected back to the same page they started checkout on
-      const callbackUrl = `${window.location.origin}${window.location.pathname}`;
-
-      const initRes = await fetch(`${serverUrl}/api/paystack/initialize`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: user.email,
-          packageType,
-          courseId: course.id,
-          userId: user.id,
-          deliveryLocation: finalLocation,
-          callbackUrl,
-        }),
+      const callbackUrl = `${window.location.origin}/payment/callback`;
+      const checkout = await initializePaystackCheckout({
+        email: user.email,
+        packageType,
+        courseId: course.id,
+        userId: user.id,
+        deliveryLocation: finalLocation,
+        callbackUrl,
       });
 
-      const initData = await initRes.json();
-      if (!initRes.ok || !initData.success) {
-        throw new Error(initData.message || 'Failed to initialize payment with server');
-      }
+      savePendingRegistration({
+        courseId: course.id,
+        packageType,
+        deliveryLocation: finalLocation,
+        amountKobo: checkout.amountKobo ?? selectedPackage.amountKobo,
+        returnPath: window.location.pathname || '/dashboard',
+      });
 
-      // Redirect the user to the Paystack hosted secure payment page
-      window.location.href = initData.authorization_url;
+      window.location.href = checkout.authorizationUrl;
     } catch (err) {
-      console.error('Checkout error:', err);
+      clearPendingRegistration();
       toast.error('Payment checkout failed', (err as Error).message);
       setPaying(false);
     }

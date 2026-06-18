@@ -64,10 +64,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
 
-      if (!data) {
+      if (!data && sessionUser) {
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: sessionUser.id,
+            email: sessionUser.email,
+            full_name:
+              sessionUser.user_metadata?.full_name ||
+              sessionUser.user_metadata?.name ||
+              sessionUser.email ||
+              'New User',
+            role: 'student',
+          });
+
+        if (!insertError) {
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', sessionUser.id)
+            .single();
+
+          if (newProfile) {
+            applyProfile(newProfile);
+          }
+        }
+
         return;
       }
 
+      if (!data) return;
       applyProfile(data);
     } catch {
       if (sessionUser) {

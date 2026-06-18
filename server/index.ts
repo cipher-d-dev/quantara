@@ -13,18 +13,33 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Initialize Supabase Admin client if credentials exist (optional backend DB write)
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin =
   supabaseUrl && supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'https://quantara-labs.vercel.app',
+  ...(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
 
 // Enable CORS
 app.use(
   cors({
-    origin: '*', // Allows frontend Vercel and localhost requests
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked origin: ${origin}`));
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
@@ -71,8 +86,8 @@ app.post('/api/paystack/initialize', async (req, res) => {
     // Resolve pricing securely on the backend
     const amountKobo =
       packageType === 'basic'
-        ? Number(process.env.VITE_BASIC_PACKAGE_AMOUNT_KOBO || 300000)
-        : Number(process.env.VITE_PRO_PACKAGE_AMOUNT_KOBO || 400000);
+        ? Number(process.env.BASIC_PACKAGE_AMOUNT_KOBO || process.env.VITE_BASIC_PACKAGE_AMOUNT_KOBO || 300000)
+        : Number(process.env.PRO_PACKAGE_AMOUNT_KOBO || process.env.VITE_PRO_PACKAGE_AMOUNT_KOBO || 400000);
 
     const reference = `qr_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
 
@@ -86,7 +101,7 @@ app.post('/api/paystack/initialize', async (req, res) => {
         email,
         amount: amountKobo,
         reference,
-        currency: process.env.VITE_PAYSTACK_CURRENCY || 'NGN',
+        currency: process.env.PAYSTACK_CURRENCY || process.env.VITE_PAYSTACK_CURRENCY || 'NGN',
         callback_url: callbackUrl,
         metadata: {
           courseId,
@@ -121,11 +136,8 @@ app.post('/api/paystack/initialize', async (req, res) => {
   }
 });
 
-// Paystack Transaction Verification Endpoint
-app.post('/api/paystack/verify', async (req, res) => {
+async function verifyPaystackReference(reference, res) {
   try {
-    const { reference } = req.body;
-
     if (!reference) {
       return res.status(400).json({
         success: false,
@@ -201,6 +213,7 @@ app.post('/api/paystack/verify', async (req, res) => {
     return res.json({
       success: true,
       reference: data.data.reference,
+      amount: data.data.amount,
       amountKobo: data.data.amount,
       email: data.data.customer.email,
       status: data.data.status,
@@ -214,6 +227,15 @@ app.post('/api/paystack/verify', async (req, res) => {
       message: 'Internal server error during payment verification',
     });
   }
+}
+
+// Paystack Transaction Verification Endpoint
+app.post('/api/paystack/verify', async (req, res) => {
+  return verifyPaystackReference(req.body.reference, res);
+});
+
+app.get('/api/paystack/verify/:reference', async (req, res) => {
+  return verifyPaystackReference(req.params.reference, res);
 });
 
 // Start express server

@@ -4,6 +4,8 @@ export {
   useCatalogCourses,
   useMyRegistrations,
   useRegisterForCourse,
+  useHasRegistration,
+  useHasRegistrationForPaymentReference,
   useUnregisterFromCourse,
 } from './useCourses';
 

@@ -1,6 +1,6 @@
 import type { RegistrationPackage } from '../types/database';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const PENDING_REGISTRATION_KEY = 'quantara_pending_registration';
 
@@ -16,6 +16,7 @@ type InitializeResponse = {
   success: boolean;
   authorization_url?: string;
   reference?: string;
+  amountKobo?: number;
   message?: string;
 };
 
@@ -24,8 +25,10 @@ type VerifyResponse = {
   status?: string;
   reference?: string;
   amount?: number;
+  amountKobo?: number;
   currency?: string;
   metadata?: Record<string, unknown>;
+  dbRegistered?: boolean;
   message?: string;
 };
 
@@ -34,11 +37,13 @@ export function createPaymentReference(userId: string, courseId: string) {
 }
 
 export function savePendingRegistration(pending: PendingRegistration) {
-  sessionStorage.setItem(PENDING_REGISTRATION_KEY, JSON.stringify(pending));
+  localStorage.setItem(PENDING_REGISTRATION_KEY, JSON.stringify(pending));
 }
 
 export function loadPendingRegistration(): PendingRegistration | null {
-  const raw = sessionStorage.getItem(PENDING_REGISTRATION_KEY);
+  const raw =
+    localStorage.getItem(PENDING_REGISTRATION_KEY) ||
+    sessionStorage.getItem(PENDING_REGISTRATION_KEY);
   if (!raw) return null;
 
   try {
@@ -49,20 +54,23 @@ export function loadPendingRegistration(): PendingRegistration | null {
 }
 
 export function clearPendingRegistration() {
+  localStorage.removeItem(PENDING_REGISTRATION_KEY);
   sessionStorage.removeItem(PENDING_REGISTRATION_KEY);
 }
 
 export async function initializePaystackCheckout({
   email,
-  amountKobo,
-  reference,
-  metadata,
+  packageType,
+  courseId,
+  userId,
+  deliveryLocation,
   callbackUrl,
 }: {
   email: string;
-  amountKobo: number;
-  reference: string;
-  metadata?: Record<string, unknown>;
+  packageType: RegistrationPackage;
+  courseId: string;
+  userId: string;
+  deliveryLocation: string;
   callbackUrl?: string;
 }) {
   const response = await fetch(`${API_URL}/api/paystack/initialize`, {
@@ -70,11 +78,11 @@ export async function initializePaystackCheckout({
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email,
-      amount: amountKobo,
-      reference,
-      currency: 'NGN',
-      callback_url: callbackUrl || `${window.location.origin}/payment/callback`,
-      metadata,
+      packageType,
+      courseId,
+      userId,
+      deliveryLocation,
+      callbackUrl: callbackUrl || `${window.location.origin}/payment/callback`,
     }),
   });
 
@@ -86,7 +94,8 @@ export async function initializePaystackCheckout({
 
   return {
     authorizationUrl: payload.authorization_url,
-    reference: payload.reference || reference,
+    reference: payload.reference,
+    amountKobo: payload.amountKobo,
   };
 }
 
