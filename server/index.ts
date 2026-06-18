@@ -136,7 +136,7 @@ app.post('/api/paystack/initialize', async (req, res) => {
   }
 });
 
-async function verifyPaystackReference(reference, res) {
+async function verifyPaystackReference(reference: string, res: any) {
   try {
     if (!reference) {
       return res.status(400).json({
