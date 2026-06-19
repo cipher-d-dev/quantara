@@ -180,3 +180,5 @@ export function CourseCard({
     </div>
   );
 }
+
+// Farouq: 08119818625
