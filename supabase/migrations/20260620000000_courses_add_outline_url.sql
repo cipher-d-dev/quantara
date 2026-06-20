@@ -1,0 +1,3 @@
+-- SUPERSEDED: outline_url belongs on registrations (students upload their own outlines).
+-- See 20260620010000_registrations_add_outline_url.sql for the correct migration.
+-- This migration is intentionally a no-op.

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Calendar, Clock, TrendingUp, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Paperclip, TrendingUp, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCoursesForUser, useMyRegistrations, useRegisterForCourse, useUnregisterFromCourse } from '../hooks';
 import { useToast } from '../contexts/ToastContext';
@@ -38,6 +38,7 @@ export function StudentDashboard() {
       amountKobo: r.amount_kobo,
       paymentStatus: r.payment_status,
       registeredAt: r.created_at,
+      outlineUrl: r.outline_url,
     })) || [];
 
   const availableCourses = courses?.filter((c) => !c.is_registered) || [];
@@ -250,6 +251,17 @@ export function StudentDashboard() {
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                           Registered {new Date(course.registeredAt).toLocaleDateString()}
                         </p>
+                        {course.outlineUrl && (
+                          <a
+                            href={course.outlineUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-2 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            View outline
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>

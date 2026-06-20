@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { CreditCard, MapPin, ShieldCheck, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { CreditCard, MapPin, ShieldCheck, Sparkles, Paperclip, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select } from './ui/Select';
+import { supabase } from '../lib/supabase';
 import type { Course, RegistrationPackage } from '../types/database';
 import {
   formatNaira,
@@ -45,6 +46,9 @@ export function RegisterPackageModal({
   const [packageType, setPackageType] = useState<RegistrationPackage>('basic');
   const [deliveryLocation, setDeliveryLocation] = useState(GENERAL_DELIVERY_LOCATION);
   const [customLocation, setCustomLocation] = useState('');
+  const [outlineFile, setOutlineFile] = useState<File | null>(null);
+  const [uploadingOutline, setUploadingOutline] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [paying, setPaying] = useState(false);
 
   useEffect(() => {
@@ -53,6 +57,7 @@ export function RegisterPackageModal({
     setPackageType('basic');
     setDeliveryLocation(GENERAL_DELIVERY_LOCATION);
     setCustomLocation('');
+    setOutlineFile(null);
     setPaying(false);
   }, [isOpen, course?.id]);
 
@@ -94,16 +99,43 @@ export function RegisterPackageModal({
       return;
     }
 
+    // 2. Validate outline required
+    if (!outlineFile) {
+      toast.warning('Please attach your course outline before proceeding');
+      return;
+    }
+
     setPaying(true);
 
     try {
+      // 3. Upload outline to Supabase Storage
+      setUploadingOutline(true);
+      const ext = outlineFile.name.split('.').pop();
+      const storagePath = `${user!.id}-${course.id}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('course-outlines')
+        .upload(storagePath, outlineFile, { upsert: true });
+      setUploadingOutline(false);
+
+      if (uploadError) {
+        toast.error('Outline upload failed', uploadError.message);
+        setPaying(false);
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-outlines')
+        .getPublicUrl(storagePath);
+
+      // 4. Initialize Paystack checkout
       const callbackUrl = `${window.location.origin}/payment/callback`;
       const checkout = await initializePaystackCheckout({
-        email: user.email,
+        email: user!.email,
         packageType,
         courseId: course.id,
-        userId: user.id,
+        userId: user!.id,
         deliveryLocation: finalLocation,
+        outlineUrl: publicUrl,
         callbackUrl,
       });
 
@@ -113,6 +145,7 @@ export function RegisterPackageModal({
         deliveryLocation: finalLocation,
         amountKobo: checkout.amountKobo ?? selectedPackage.amountKobo,
         returnPath: window.location.pathname || '/dashboard',
+        outlineUrl: publicUrl,
       });
 
       window.location.href = checkout.authorizationUrl;
@@ -209,6 +242,49 @@ export function RegisterPackageModal({
                 />
               )}
             </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-surface-900 dark:text-surface-100">
+            <Paperclip className="w-4 h-4 text-brand-500" />
+            Course Outline
+            <span className="text-error-500">*</span>
+          </div>
+          <p className="text-xs text-surface-500 dark:text-surface-400">
+            Attach your course outline (PDF or DOCX) so we can format your lab report correctly.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx"
+            className="hidden"
+            onChange={(e) => setOutlineFile(e.target.files?.[0] ?? null)}
+          />
+          {outlineFile ? (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/20">
+              <Paperclip className="w-4 h-4 text-brand-500 shrink-0" />
+              <span className="text-sm text-surface-700 dark:text-surface-300 flex-1 truncate">
+                {outlineFile.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setOutlineFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                className="text-surface-400 hover:text-error-500 transition-colors cursor-pointer"
+                aria-label="Remove file"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-700 text-sm text-surface-500 hover:border-brand-400 hover:text-brand-500 transition-colors cursor-pointer"
+            >
+              <Paperclip className="w-4 h-4" />
+              Attach course outline
+            </button>
           )}
         </div>
 

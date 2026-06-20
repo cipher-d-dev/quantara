@@ -54,6 +54,7 @@ async function getMyRegistrations(userId: string) {
       payment_reference,
       payment_status,
       amount_kobo,
+      outline_url,
       created_at,
       course:courses (*)
     `
@@ -74,6 +75,7 @@ async function getMyRegistrations(userId: string) {
       payment_reference: row.payment_reference,
       payment_status: row.payment_status,
       amount_kobo: row.amount_kobo,
+      outline_url: row.outline_url,
       created_at: row.created_at,
       course,
     };
@@ -87,7 +89,8 @@ async function registerForCourse(
   deliveryLocation: string = 'The Engineering Civil Shed',
   paymentReference: string | null = null,
   paymentStatus: 'pending' | 'paid' | 'failed' = 'paid',
-  amountKobo: number = 0
+  amountKobo: number = 0,
+  outlineUrl: string | null = null
 ) {
   if (paymentReference) {
     const { data: existingPaymentRegistration, error: existingPaymentError } = await supabase
@@ -137,6 +140,7 @@ async function registerForCourse(
       payment_reference: paymentReference,
       payment_status: paymentStatus,
       amount_kobo: amountKobo,
+      outline_url: outlineUrl,
     },
     {
       onConflict: 'user_id,course_id',
@@ -247,6 +251,7 @@ export function useRegisterForCourse() {
       paymentReference,
       paymentStatus,
       amountKobo,
+      outlineUrl,
     }: {
       userId: string;
       courseId: string;
@@ -255,6 +260,7 @@ export function useRegisterForCourse() {
       paymentReference?: string | null;
       paymentStatus?: 'pending' | 'paid' | 'failed';
       amountKobo?: number;
+      outlineUrl?: string | null;
     }) =>
       registerForCourse(
         userId,
@@ -263,7 +269,8 @@ export function useRegisterForCourse() {
         deliveryLocation,
         paymentReference,
         paymentStatus,
-        amountKobo
+        amountKobo,
+        outlineUrl ?? null
       ),
   });
 }

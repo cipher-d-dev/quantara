@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react';
 import { Users, Calendar, CheckCircle2 } from 'lucide-react';
 import gsap from 'gsap';
 import type { CourseWithSlots } from '../types/database';
-import { Button, Badge } from '../components/ui';
+import { Button, Badge } from './ui';
 import { useAuth } from '../contexts/AuthContext';
 
 interface CourseCardProps {

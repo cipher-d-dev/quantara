@@ -10,6 +10,7 @@ export type PendingRegistration = {
   deliveryLocation: string;
   amountKobo: number;
   returnPath: string;
+  outlineUrl?: string | null;
 };
 
 type InitializeResponse = {
@@ -64,6 +65,7 @@ export async function initializePaystackCheckout({
   courseId,
   userId,
   deliveryLocation,
+  outlineUrl,
   callbackUrl,
 }: {
   email: string;
@@ -71,6 +73,7 @@ export async function initializePaystackCheckout({
   courseId: string;
   userId: string;
   deliveryLocation: string;
+  outlineUrl?: string | null;
   callbackUrl?: string;
 }) {
   const response = await fetch(`${API_URL}/api/paystack/initialize`, {
@@ -82,6 +85,7 @@ export async function initializePaystackCheckout({
       courseId,
       userId,
       deliveryLocation,
+      outlineUrl: outlineUrl ?? null,
       callbackUrl: callbackUrl || `${window.location.origin}/payment/callback`,
     }),
   });

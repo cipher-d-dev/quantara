@@ -153,6 +153,7 @@ app.post("/api/paystack/initialize", async (req, res) => {
       courseId,
       userId,
       deliveryLocation,
+      outlineUrl,
       callbackUrl,
     } = req.body;
 
@@ -217,6 +218,7 @@ app.post("/api/paystack/initialize", async (req, res) => {
             userId,
             packageType,
             deliveryLocation,
+            outlineUrl: outlineUrl ?? null,
           },
         }),
       },
@@ -341,6 +343,7 @@ async function verifyPaystackReference(reference: string, res: any) {
             payment_reference: paymentRef,
             payment_status: "paid",
             amount_kobo: data.data.amount,
+            outline_url: (metadata.outlineUrl as string | null) ?? null,
           });
 
         if (insertError) {

@@ -26,7 +26,6 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
 
   useEffect(() => {
     if (!isOpen) return;
-
     setCode(course?.code || '');
     setTitle(course?.title || '');
     setDescription(course?.description || '');
@@ -37,11 +36,9 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-
     if (!code.trim()) newErrors.code = 'Course code is required';
     if (!title.trim()) newErrors.title = 'Course title is required';
     if (!maxSlots || parseInt(maxSlots) < 1) newErrors.maxSlots = 'Must be at least 1 slot';
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -49,7 +46,6 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-
     try {
       const courseData = {
         code: code.trim().toUpperCase(),
@@ -58,7 +54,6 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
         max_slots: parseInt(maxSlots),
         registration_open: registrationOpen,
       };
-
       if (isEditing) {
         await updateCourse.mutateAsync({ id: course.id, updates: courseData });
         toast.success('Course updated successfully');
@@ -131,10 +126,7 @@ export function CourseModal({ isOpen, onClose, course }: CourseModalProps) {
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            loading={createCourse.isPending || updateCourse.isPending}
-          >
+          <Button type="submit" loading={createCourse.isPending || updateCourse.isPending}>
             {isEditing ? 'Save Changes' : 'Create Course'}
           </Button>
         </div>

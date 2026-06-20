@@ -77,6 +77,7 @@ export interface Database {
           payment_reference: string | null;
           payment_status: 'pending' | 'paid' | 'failed';
           amount_kobo: number;
+          outline_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -88,6 +89,7 @@ export interface Database {
           payment_reference?: string | null;
           payment_status?: 'pending' | 'paid' | 'failed';
           amount_kobo?: number;
+          outline_url?: string | null;
           created_at?: string;
         };
         Update: {
@@ -99,6 +101,7 @@ export interface Database {
           payment_reference?: string | null;
           payment_status?: 'pending' | 'paid' | 'failed';
           amount_kobo?: number;
+          outline_url?: string | null;
           created_at?: string;
         };
       };

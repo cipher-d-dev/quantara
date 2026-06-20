@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Calendar, Pencil, Plus, Search, Trash2, TrendingUp, Users } from 'lucide-react';
+import { Calendar, Paperclip, Pencil, Plus, Search, Trash2, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   useAdminStats,
@@ -337,6 +337,7 @@ export function AdminDashboard() {
                   <th className="pb-3 px-4">Package</th>
                   <th className="pb-3 px-4">Delivery</th>
                   <th className="pb-3 px-4">Payment</th>
+                  <th className="pb-3 px-4">Outline</th>
                   <th className="pb-3 pl-4 text-right">Date</th>
                 </tr>
               </thead>
@@ -383,6 +384,22 @@ export function AdminDashboard() {
                       >
                         Ref: {registration.payment_reference || 'N/A'}
                       </p>
+                    </td>
+                    <td className="py-3 px-4">
+                      {registration.outline_url ? (
+                        <a
+                          href={registration.outline_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                          title="View course outline"
+                        >
+                          <Paperclip className="w-3 h-3" />
+                          View
+                        </a>
+                      ) : (
+                        <span className="text-xs text-surface-400 dark:text-surface-600">—</span>
+                      )}
                     </td>
                     <td className="py-3 pl-4 text-right text-xs text-surface-500 dark:text-surface-400">
                       {new Date(registration.created_at).toLocaleDateString()}

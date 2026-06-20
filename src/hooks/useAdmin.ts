@@ -54,6 +54,7 @@ async function getAllRegistrations() {
       payment_reference,
       payment_status,
       amount_kobo,
+      outline_url,
       user:profiles (id, full_name, email, phone, department),
       course:courses (id, code, title)
     `
