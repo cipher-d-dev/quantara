@@ -29,26 +29,34 @@ const icons: Record<ToastType, React.ComponentType<{ className?: string }>> = {
   info: Info,
 };
 
-const styles: Record<ToastType, { bg: string; icon: string; border: string }> = {
+const styles: Record<ToastType, { bg: string; icon: string; border: string; title: string; msg: string }> = {
   success: {
-    bg: 'bg-success-50 dark:bg-success-950/50',
-    icon: 'text-success-600',
-    border: 'border-success-200 dark:border-success-800',
+    bg: 'bg-success-50 dark:bg-success-900',
+    icon: 'text-success-600 dark:text-success-400',
+    border: 'border-success-200 dark:border-success-700',
+    title: 'text-success-900 dark:text-success-100',
+    msg: 'text-success-700 dark:text-success-300',
   },
   error: {
-    bg: 'bg-error-50 dark:bg-error-950/50',
-    icon: 'text-error-600',
-    border: 'border-error-200 dark:border-error-800',
+    bg: 'bg-error-50 dark:bg-error-900',
+    icon: 'text-error-600 dark:text-error-400',
+    border: 'border-error-200 dark:border-error-700',
+    title: 'text-error-900 dark:text-error-100',
+    msg: 'text-error-700 dark:text-error-300',
   },
   warning: {
-    bg: 'bg-warning-50 dark:bg-warning-950/50',
-    icon: 'text-warning-600',
-    border: 'border-warning-200 dark:border-warning-800',
+    bg: 'bg-warning-50 dark:bg-warning-900',
+    icon: 'text-warning-600 dark:text-warning-400',
+    border: 'border-warning-200 dark:border-warning-700',
+    title: 'text-warning-900 dark:text-warning-100',
+    msg: 'text-warning-700 dark:text-warning-300',
   },
   info: {
-    bg: 'bg-brand-50 dark:bg-brand-950/50',
-    icon: 'text-brand-600',
-    border: 'border-brand-200 dark:border-brand-800',
+    bg: 'bg-brand-50 dark:bg-brand-900',
+    icon: 'text-brand-600 dark:text-brand-400',
+    border: 'border-brand-200 dark:border-brand-700',
+    title: 'text-brand-900 dark:text-brand-100',
+    msg: 'text-brand-700 dark:text-brand-300',
   },
 };
 
@@ -102,9 +110,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${style.icon}`} />
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-surface-900 dark:text-surface-100">{t.title}</p>
+                <p className={`font-medium ${style.title}`}>{t.title}</p>
                 {t.message && (
-                  <p className="text-sm text-surface-600 dark:text-surface-400 mt-0.5">{t.message}</p>
+                  <p className={`text-sm mt-0.5 ${style.msg}`}>{t.message}</p>
                 )}
               </div>
               <button

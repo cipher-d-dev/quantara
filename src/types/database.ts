@@ -15,6 +15,8 @@ export interface Database {
           full_name: string;
           email: string;
           role: 'student' | 'admin';
+          phone: string | null;
+          department: string | null;
           created_at: string;
         };
         Insert: {
@@ -22,6 +24,8 @@ export interface Database {
           full_name: string;
           email: string;
           role?: 'student' | 'admin';
+          phone?: string | null;
+          department?: string | null;
           created_at?: string;
         };
         Update: {
@@ -29,6 +33,8 @@ export interface Database {
           full_name?: string;
           email?: string;
           role?: 'student' | 'admin';
+          phone?: string | null;
+          department?: string | null;
           created_at?: string;
         };
       };

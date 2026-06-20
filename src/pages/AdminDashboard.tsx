@@ -348,6 +348,16 @@ export function AdminDashboard() {
                       <p className="text-xs text-surface-500 dark:text-surface-400">
                         {registration.user?.email || 'No email'}
                       </p>
+                      {registration.user?.phone && (
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                          {registration.user.phone}
+                        </p>
+                      )}
+                      {registration.user?.department && (
+                        <p className="text-xs text-brand-600 dark:text-brand-400 font-medium">
+                          {registration.user.department}
+                        </p>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <Badge variant={registration.package_type === 'pro' ? 'info' : 'default'}>

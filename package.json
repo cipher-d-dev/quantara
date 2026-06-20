@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "concurrently \"npm:client:dev\" \"npm:server:dev\"",
     "client:dev": "vite",
-    "server:dev": "nodemon --exec tsx server/index.ts",
-    "dev:server": "nodemon --exec tsx server/index.ts",
-    "server:start": "tsx server/index.ts",
+    "server:dev": "nodemon --exec tsx server/src/index.ts",
+    "dev:server": "nodemon --exec tsx server/src/index.ts",
+    "server:start": "tsx server/src/index.ts",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

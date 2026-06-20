@@ -9,7 +9,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   profileLoading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ data: any; error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, phone?: string, department?: string) => Promise<{ data: any; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -76,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               sessionUser.email ||
               'New User',
             role: 'student',
+            phone: sessionUser.user_metadata?.phone ?? null,
+            department: sessionUser.user_metadata?.department ?? null,
           });
 
         if (!insertError) {
@@ -168,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [applySessionUserFallback, fetchProfile]);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, phone?: string, department?: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -176,6 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           data: {
             full_name: fullName,
+            phone: phone ?? null,
+            department: department ?? null,
           },
           emailRedirectTo: `${window.location.origin}/login`,
         },

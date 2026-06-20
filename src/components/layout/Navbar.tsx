@@ -285,7 +285,7 @@ export function Navbar() {
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-2 border-t border-surface-200/60 dark:border-surface-800/60 pt-4">
+          <div className="md:hidden mt-4 pb-4 border-t border-surface-200/60 dark:border-surface-800/60 pt-4 animate-slide-down">
             <div className="flex flex-col gap-1">
               <Link
                 to="/courses"
@@ -332,7 +332,29 @@ export function Navbar() {
                     <Settings className="w-4 h-4" />
                     Settings
                   </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-950/30"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign out
+                  </button>
                 </>
+              )}
+
+              {!user && (
+                <div className="flex flex-col gap-2 pt-3 mt-2 border-t border-surface-200/60 dark:border-surface-800/60">
+                  <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                    <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer">
+                      Sign in
+                    </button>
+                  </Link>
+                  <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
+                    <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors cursor-pointer">
+                      Get started
+                    </button>
+                  </Link>
+                </div>
               )}
             </div>
           </div>
