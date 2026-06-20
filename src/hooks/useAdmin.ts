@@ -43,23 +43,45 @@ async function getAllStudents(): Promise<Profile[]> {
 }
 
 async function getAllRegistrations() {
-  const { data, error } = await supabase
+  const fullSelect = `
+    id,
+    created_at,
+    package_type,
+    delivery_location,
+    delivery_time,
+    payment_reference,
+    payment_status,
+    amount_kobo,
+    outline_url,
+    user:profiles (id, full_name, email, phone, department),
+    course:courses (id, code, title)
+  `;
+
+  let { data, error } = await supabase
     .from('registrations')
-    .select(
-      `
-      id,
-      created_at,
-      package_type,
-      delivery_location,
-      payment_reference,
-      payment_status,
-      amount_kobo,
-      outline_url,
-      user:profiles (id, full_name, email, phone, department),
-      course:courses (id, code, title)
-    `
-    )
+    .select(fullSelect)
     .order('created_at', { ascending: false });
+
+  // Fall back to base columns if new columns don't exist on remote yet (migrations pending)
+  if (error) {
+    const fallback = await supabase
+      .from('registrations')
+      .select(`
+        id,
+        created_at,
+        package_type,
+        delivery_location,
+        payment_reference,
+        payment_status,
+        amount_kobo,
+        user:profiles (id, full_name, email, phone, department),
+        course:courses (id, code, title)
+      `)
+      .order('created_at', { ascending: false });
+    if (fallback.error) throw fallback.error;
+    data = fallback.data;
+    error = null;
+  }
 
   if (error) throw error;
 

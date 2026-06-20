@@ -7,3 +7,4 @@ export { Badge } from './Badge';
 export { EmptyState } from './EmptyState';
 export { Select } from './Select';
 export { Toggle } from './Toggle';
+export { DateTimePicker } from './DateTimePicker';

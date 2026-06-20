@@ -8,6 +8,7 @@ export type PendingRegistration = {
   courseId: string;
   packageType: RegistrationPackage;
   deliveryLocation: string;
+  deliveryTime?: string | null;
   amountKobo: number;
   returnPath: string;
   outlineUrl?: string | null;
@@ -65,6 +66,7 @@ export async function initializePaystackCheckout({
   courseId,
   userId,
   deliveryLocation,
+  deliveryTime,
   outlineUrl,
   callbackUrl,
 }: {
@@ -73,6 +75,7 @@ export async function initializePaystackCheckout({
   courseId: string;
   userId: string;
   deliveryLocation: string;
+  deliveryTime?: string | null;
   outlineUrl?: string | null;
   callbackUrl?: string;
 }) {
@@ -85,6 +88,7 @@ export async function initializePaystackCheckout({
       courseId,
       userId,
       deliveryLocation,
+      deliveryTime: deliveryTime ?? null,
       outlineUrl: outlineUrl ?? null,
       callbackUrl: callbackUrl || `${window.location.origin}/payment/callback`,
     }),

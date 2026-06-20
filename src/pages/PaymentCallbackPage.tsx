@@ -58,6 +58,14 @@ export function PaymentCallbackPage() {
           pending?.deliveryLocation ||
           (metadata.deliveryLocation as string | undefined) ||
           (metadata.delivery_location as string | undefined);
+        const outlineUrl =
+          pending?.outlineUrl ||
+          (metadata.outlineUrl as string | undefined) ||
+          null;
+        const deliveryTime =
+          pending?.deliveryTime ||
+          (metadata.deliveryTime as string | undefined) ||
+          null;
         const amountKobo = pending?.amountKobo ?? verification.amountKobo ?? verification.amount ?? 0;
         const returnPath = pending?.returnPath || '/dashboard';
         const paymentReference = verification.reference || reference!;
@@ -92,6 +100,8 @@ export function PaymentCallbackPage() {
               paymentReference,
               paymentStatus: 'paid',
               amountKobo,
+              outlineUrl: outlineUrl ?? null,
+              deliveryTime: deliveryTime ?? null,
             });
           } catch (registrationError) {
             const message = (registrationError as Error).message.toLowerCase();

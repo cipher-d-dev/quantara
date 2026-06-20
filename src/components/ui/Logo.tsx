@@ -1,11 +1,83 @@
-import logo from '../../assets/logo.png';
+/**
+ * Quantara Logo
+ * Story: A stylised atom — the nucleus represents a single source of knowledge,
+ * the orbiting ring represents the AI pipeline that processes and returns it.
+ * The gap in the ring echoes the letter Q (Quantara).
+ */
+const Logo = ({ size = 40 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 40 40"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-label="Quantara logo"
+    role="img"
+    className="quantara-logo"
+    style={{ flexShrink: 0 }}
+  >
+    <style>{`
+      .quantara-logo .ring {
+        transform-origin: 20px 20px;
+        transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .quantara-logo:hover .ring {
+        transform: rotate(180deg);
+      }
+      .quantara-logo .nucleus {
+        transition: r 0.3s ease, opacity 0.3s ease;
+      }
+      .quantara-logo:hover .nucleus {
+        r: 4;
+      }
+    `}</style>
 
-const Logo = () => {
-    return (
-        <div className="h-10 w-10 rounded-[25%] overflow-hidden">
-            <img src={logo} alt="Quantara Logo" className="h-full w-full" />
-        </div>
-    )
-}
+    {/* Background pill */}
+    <rect width="40" height="40" rx="10" fill="url(#logo-bg)" />
+
+    {/* Orbit ring with Q-gap */}
+    <circle
+      className="ring"
+      cx="20"
+      cy="20"
+      r="11"
+      stroke="url(#logo-ring)"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeDasharray="56 14"
+      strokeDashoffset="0"
+      fill="none"
+    />
+
+    {/* Nucleus */}
+    <circle className="nucleus" cx="20" cy="20" r="3" fill="url(#logo-nucleus)" />
+
+    {/* Tail of the Q — the "exit vector" */}
+    <line
+      x1="28"
+      y1="28"
+      x2="32"
+      y2="32"
+      stroke="url(#logo-ring)"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    />
+
+    <defs>
+      <linearGradient id="logo-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#4f46e5" />
+        <stop offset="100%" stopColor="#6366f1" />
+      </linearGradient>
+      <linearGradient id="logo-ring" x1="9" y1="9" x2="31" y2="31" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#c7d2fe" />
+        <stop offset="100%" stopColor="#e0e7ff" />
+      </linearGradient>
+      <radialGradient id="logo-nucleus" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="100%" stopColor="#c7d2fe" />
+      </radialGradient>
+    </defs>
+  </svg>
+);
 
 export default Logo;

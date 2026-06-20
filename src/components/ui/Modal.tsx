@@ -116,12 +116,12 @@ export function Modal({
             bg-surface-0 dark:bg-surface-900
             rounded-2xl shadow-xl shadow-surface-950/10 dark:shadow-surface-950/40
             border border-surface-200/80 dark:border-surface-800/80
-            overflow-hidden
+            flex flex-col max-h-[90vh]
           `}
           onClick={(e) => e.stopPropagation()}
         >
           {(title || description) && (
-            <div className="flex items-start justify-between p-6 pb-0">
+            <div className="flex items-start justify-between p-6 pb-0 shrink-0">
               <div>
                 {title && (
                   <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100">
@@ -144,7 +144,7 @@ export function Modal({
               )}
             </div>
           )}
-          <div className="p-6">{children}</div>
+          <div className="p-6 overflow-y-auto">{children}</div>
         </div>
       </div>
     </Fragment>

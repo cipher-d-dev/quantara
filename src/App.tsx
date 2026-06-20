@@ -12,6 +12,7 @@ import {
   CourseCatalogPage,
   SettingsPage,
   PaymentCallbackPage,
+  TermsPage,
 } from './pages';
 import { Skeleton } from './components/ui';
 
@@ -289,6 +290,7 @@ function AppRoutes() {
         }
       />
       <Route path="/courses" element={<CourseCatalogPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route
         path="/payment/callback"
         element={

@@ -337,7 +337,7 @@ export function AdminDashboard() {
                   <th className="pb-3 px-4">Package</th>
                   <th className="pb-3 px-4">Delivery</th>
                   <th className="pb-3 px-4">Payment</th>
-                  <th className="pb-3 px-4">Outline</th>
+                  <th className="pb-3 px-4">Lab Guidelines</th>
                   <th className="pb-3 pl-4 text-right">Date</th>
                 </tr>
               </thead>
@@ -366,10 +366,18 @@ export function AdminDashboard() {
                       </Badge>
                     </td>
                     <td
-                      className="py-3 px-4 text-xs text-surface-600 dark:text-surface-400 max-w-[180px] truncate"
+                      className="py-3 px-4 text-xs text-surface-600 dark:text-surface-400 max-w-[180px]"
                       title={registration.delivery_location}
                     >
-                      {registration.delivery_location}
+                      <p className="truncate">{registration.delivery_location}</p>
+                      {registration.delivery_time && (
+                        <p className="text-[10px] text-brand-600 dark:text-brand-400 mt-0.5">
+                          {new Date(registration.delivery_time).toLocaleString('en-NG', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })}
+                        </p>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <p className="font-semibold text-xs">
@@ -387,16 +395,40 @@ export function AdminDashboard() {
                     </td>
                     <td className="py-3 px-4">
                       {registration.outline_url ? (
-                        <a
-                          href={registration.outline_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
-                          title="View course outline"
-                        >
-                          <Paperclip className="w-3 h-3" />
-                          View
-                        </a>
+                        <div className="flex flex-col items-start gap-1.5">
+                          <a
+                            href={registration.outline_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                            title="View lab guidelines"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            View
+                          </a>
+                          <button
+                            type="button"
+                            title="Download lab guidelines"
+                            className="text-xs text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 cursor-pointer"
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(registration.outline_url!);
+                                const blob = await res.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                const ext = registration.outline_url!.split('.').pop()?.split('?')[0] ?? 'pdf';
+                                a.download = `outline-${registration.id}.${ext}`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              } catch {
+                                window.open(registration.outline_url!, '_blank');
+                              }
+                            }}
+                          >
+                            ↓ Download
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-xs text-surface-400 dark:text-surface-600">—</span>
                       )}

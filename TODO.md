@@ -222,6 +222,11 @@ Improve navigation experience on mobile devices.
 
 Cleaner mobile experience and more polished presentation.
 
+
+### Important Add On's
+* The current logo for quantara is an image without story, generate an interactive log for quantara and replace the current logo accross all references and add the logo to the emails for payment receipts, and update the logo everywhere applicable
+* Redesign the Dashbord Screen and Admin Screen, Basically all screen aside from the landing page, and signup and login, the design principle is that of the redesign when it came to the login and signup screens, with consistent icons and story telling subtle animations and the other redesign concepts you used
+* When the admin view registred students and their lab guideline, stack the view and download button on top eachother
 ---
 
 # Recommended Build Order

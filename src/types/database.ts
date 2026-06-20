@@ -74,6 +74,7 @@ export interface Database {
           course_id: string;
           package_type: 'basic' | 'pro';
           delivery_location: string;
+          delivery_time: string | null;
           payment_reference: string | null;
           payment_status: 'pending' | 'paid' | 'failed';
           amount_kobo: number;
@@ -86,6 +87,7 @@ export interface Database {
           course_id: string;
           package_type?: 'basic' | 'pro';
           delivery_location?: string;
+          delivery_time?: string | null;
           payment_reference?: string | null;
           payment_status?: 'pending' | 'paid' | 'failed';
           amount_kobo?: number;
@@ -98,6 +100,7 @@ export interface Database {
           course_id?: string;
           package_type?: 'basic' | 'pro';
           delivery_location?: string;
+          delivery_time?: string | null;
           payment_reference?: string | null;
           payment_status?: 'pending' | 'paid' | 'failed';
           amount_kobo?: number;

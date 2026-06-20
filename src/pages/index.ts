@@ -6,3 +6,4 @@ export { AdminDashboard } from './AdminDashboard';
 export { CourseCatalogPage } from './CourseCatalogPage';
 export { SettingsPage } from './SettingsPage';
 export { PaymentCallbackPage } from './PaymentCallbackPage';
+export { TermsPage } from './TermsPage';

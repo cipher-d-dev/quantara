@@ -67,9 +67,12 @@ async function sendReceiptEmail(opts: {
 
   const html = `
     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#09090b;color:#e4e4e7;border-radius:12px;padding:32px;">
-      <div style="margin-bottom:24px;">
-        <h1 style="font-size:22px;font-weight:700;color:#ffffff;margin:0 0 4px">Payment Receipt</h1>
-        <p style="color:#71717a;font-size:14px;margin:0">Quantara Lab Reports</p>
+      <div style="margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+        <img src="https://quantara-labs.vercel.app/logo.svg" alt="Quantara" width="40" height="40" style="border-radius:10px;display:block;" onerror="this.style.display='none'" />
+        <div>
+          <h1 style="font-size:22px;font-weight:700;color:#ffffff;margin:0 0 2px">Payment Receipt</h1>
+          <p style="color:#71717a;font-size:13px;margin:0">Quantara Lab Reports</p>
+        </div>
       </div>
       <p style="font-size:15px;color:#a1a1aa;margin:0 0 24px">Hi <strong style="color:#e4e4e7">${opts.studentName}</strong>, your payment was successful. Here's your receipt.</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
@@ -153,6 +156,7 @@ app.post("/api/paystack/initialize", async (req, res) => {
       courseId,
       userId,
       deliveryLocation,
+      deliveryTime,
       outlineUrl,
       callbackUrl,
     } = req.body;
@@ -218,6 +222,7 @@ app.post("/api/paystack/initialize", async (req, res) => {
             userId,
             packageType,
             deliveryLocation,
+            deliveryTime: deliveryTime ?? null,
             outlineUrl: outlineUrl ?? null,
           },
         }),
@@ -340,6 +345,7 @@ async function verifyPaystackReference(reference: string, res: any) {
             package_type: metadata.packageType || "basic",
             delivery_location:
               metadata.deliveryLocation || "The Engineering Civil Shed",
+            delivery_time: (metadata.deliveryTime as string | null) ?? null,
             payment_reference: paymentRef,
             payment_status: "paid",
             amount_kobo: data.data.amount,
