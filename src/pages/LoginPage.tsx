@@ -6,7 +6,6 @@ import gsap from 'gsap';
 import { useAuth, getDefaultRouteForRole } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
-import { Button, Input } from '../components/ui';
 import AuthCharacter, { AuthCharacterHandle } from '../components/AuthCharacter';
 
 function GoogleIcon({ className = 'w-5 h-5' }: { className?: string }) {

@@ -8,7 +8,6 @@ import { useToast } from '../contexts/ToastContext';
 import { DashboardLayout } from '../components/layout';
 import { Badge, Button, CourseCardSkeleton, ConfirmModal } from '../components/ui';
 import { CourseCard } from '../components/CourseCard';
-import Logo from '../components/ui/Logo';
 import { RegisterPackageModal } from '../components/RegisterPackageModal';
 import type { Course } from '../types/database';
 import { formatNaira } from '../lib/packages';

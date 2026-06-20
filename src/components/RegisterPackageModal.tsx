@@ -151,6 +151,11 @@ export function RegisterPackageModal({
     try {
       // Upload lab guidelines to Supabase Storage
       setUploadingOutline(true);
+      if (!outlineFile) {
+        toast.warning('Please attach your lab guidelines before proceeding');
+        setPaying(false);
+        return;
+      }
       const ext = outlineFile.name.split('.').pop();
       const storagePath = `${user!.id}-${course.id}-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
