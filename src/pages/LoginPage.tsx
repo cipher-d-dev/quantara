@@ -111,9 +111,18 @@ export function LoginPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_40%,rgba(99,102,241,0.12)_0%,transparent_70%)]" />
 
         <div className="relative z-10 p-8">
-          <Link to="/" className="flex items-center gap-3 cursor-pointer w-fit">
-            <Logo />
-            <span className="text-lg font-bold text-white tracking-tight">Quantara</span>
+          <Link to="/" className="flex items-center gap-3 group cursor-pointer">
+            <div>
+              <Logo />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold text-surface-900 dark:text-surface-100 tracking-tight">
+                Quantara
+              </span>
+              <span className="text-[10px] text-surface-400 dark:text-surface-500 -mt-0.5 tracking-wide">
+                Laboratory Workflow
+              </span>
+            </div>
           </Link>
         </div>
 

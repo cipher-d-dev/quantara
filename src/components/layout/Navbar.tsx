@@ -252,7 +252,7 @@ export function Navbar() {
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="items-center gap-2 hidden sm:flex">
                 <Link to="/login">
                   <Button variant="ghost" size="sm">
                     Sign in
