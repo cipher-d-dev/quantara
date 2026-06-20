@@ -61,47 +61,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   const setTheme = useCallback((newTheme: Theme) => {
-    const root = window.document.documentElement;
-    const currentResolved = getResolvedTheme(theme);
     const newResolved = getResolvedTheme(newTheme);
+    const currentResolved = getResolvedTheme(theme);
+
+    // Apply class immediately so all dark: variants react right away
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(newResolved);
 
     if (currentResolved !== newResolved) {
-      // Animate the transition
+      // Cosmetic overlay flash
       setIsTransitioning(true);
-
-      // Create overlay for view transitions
       const overlay = document.createElement('div');
-      overlay.style.cssText = `
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        pointer-events: none;
-        background: ${newResolved === 'dark' ? '#09090b' : '#ffffff'};
-        opacity: 0;
-      `;
+      overlay.style.cssText = `position:fixed;inset:0;z-index:9999;pointer-events:none;background:${newResolved === 'dark' ? '#09090b' : '#ffffff'};opacity:0;`;
       document.body.appendChild(overlay);
 
-      // Animate
       transitionRef.current = gsap.timeline({
-        onComplete: () => {
-          root.classList.remove('light', 'dark');
-          root.classList.add(newResolved);
-          overlay.remove();
-          setIsTransitioning(false);
-        },
+        onComplete: () => { overlay.remove(); setIsTransitioning(false); },
       });
-
       transitionRef.current
-        .to(overlay, {
-          opacity: 0.3,
-          duration: 0.2,
-          ease: 'power2.out',
-        })
-        .to(overlay, {
-          opacity: 0,
-          duration: 0.2,
-          ease: 'power2.in',
-        });
+        .to(overlay, { opacity: 0.3, duration: 0.2, ease: 'power2.out' })
+        .to(overlay, { opacity: 0, duration: 0.2, ease: 'power2.in' });
     }
 
     setThemeState(newTheme);
