@@ -1,0 +1,1295 @@
+From 03dde662332935a062a4073553af49af1964c1d8 Mon Sep 17 00:00:00 2001
+From: Favour Ejiofor <faveejiofor2009@gmail.com>
+Date: Sat, 20 Jun 2026 04:01:44 +0100
+Subject: [PATCH 2/5] fix: theme switcher break altered
+
+---
+ src/contexts/ThemeContext.tsx   |  42 +--
+ src/pages/AdminDashboard.tsx    | 448 +++++++++++++-------------------
+ src/pages/CourseCatalogPage.tsx | 187 ++++++-------
+ src/pages/SettingsPage.tsx      | 142 +++++-----
+ src/pages/StudentDashboard.tsx  | 121 +++------
+ 5 files changed, 396 insertions(+), 544 deletions(-)
+
+diff --git a/src/contexts/ThemeContext.tsx b/src/contexts/ThemeContext.tsx
+index 04697c6..91d4614 100644
+--- a/src/contexts/ThemeContext.tsx
++++ b/src/contexts/ThemeContext.tsx
+@@ -61,47 +61,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
+   }, [theme]);
+ 
+   const setTheme = useCallback((newTheme: Theme) => {
+-    const root = window.document.documentElement;
+-    const currentResolved = getResolvedTheme(theme);
+     const newResolved = getResolvedTheme(newTheme);
++    const currentResolved = getResolvedTheme(theme);
++
++    // Apply class immediately so all dark: variants react right away
++    const root = window.document.documentElement;
++    root.classList.remove('light', 'dark');
++    root.classList.add(newResolved);
+ 
+     if (currentResolved !== newResolved) {
+-      // Animate the transition
++      // Cosmetic overlay flash
+       setIsTransitioning(true);
+-
+-      // Create overlay for view transitions
+       const overlay = document.createElement('div');
+-      overlay.style.cssText = `
+-        position: fixed;
+-        inset: 0;
+-        z-index: 9999;
+-        pointer-events: none;
+-        background: ${newResolved === 'dark' ? '#09090b' : '#ffffff'};
+-        opacity: 0;
+-      `;
++      overlay.style.cssText = `position:fixed;inset:0;z-index:9999;pointer-events:none;background:${newResolved === 'dark' ? '#09090b' : '#ffffff'};opacity:0;`;
+       document.body.appendChild(overlay);
+ 
+-      // Animate
+       transitionRef.current = gsap.timeline({
+-        onComplete: () => {
+-          root.classList.remove('light', 'dark');
+-          root.classList.add(newResolved);
+-          overlay.remove();
+-          setIsTransitioning(false);
+-        },
++        onComplete: () => { overlay.remove(); setIsTransitioning(false); },
+       });
+-
+       transitionRef.current
+-        .to(overlay, {
+-          opacity: 0.3,
+-          duration: 0.2,
+-          ease: 'power2.out',
+-        })
+-        .to(overlay, {
+-          opacity: 0,
+-          duration: 0.2,
+-          ease: 'power2.in',
+-        });
++        .to(overlay, { opacity: 0.3, duration: 0.2, ease: 'power2.out' })
++        .to(overlay, { opacity: 0, duration: 0.2, ease: 'power2.in' });
+     }
+ 
+     setThemeState(newTheme);
+diff --git a/src/pages/AdminDashboard.tsx b/src/pages/AdminDashboard.tsx
+index 7d0f8e6..b73964c 100644
+--- a/src/pages/AdminDashboard.tsx
++++ b/src/pages/AdminDashboard.tsx
+@@ -1,28 +1,16 @@
+-import { useState } from 'react';
++import { useEffect, useRef, useState } from 'react';
+ import { Navigate } from 'react-router-dom';
+-import { Calendar, Paperclip, Pencil, Plus, Search, Trash2, TrendingUp, Users } from 'lucide-react';
++import { Calendar, Paperclip, Pencil, Plus, Search, Shield, Trash2, TrendingUp, Users } from 'lucide-react';
++import gsap from 'gsap';
+ import { useAuth } from '../contexts/AuthContext';
+-import {
+-  useAdminStats,
+-  useAllCourses,
+-  useAllRegistrations,
+-  useDeleteCourse,
+-} from '../hooks';
++import { useAdminStats, useAllCourses, useAllRegistrations, useDeleteCourse } from '../hooks';
+ import { useToast } from '../contexts/ToastContext';
+ import { DashboardLayout } from '../components/layout';
+-import {
+-  Badge,
+-  Button,
+-  Card,
+-  ConfirmModal,
+-  EmptyState,
+-  Modal,
+-  TableSkeleton,
+-} from '../components/ui';
++import { Badge, Button, ConfirmModal, EmptyState, Modal, TableSkeleton } from '../components/ui';
+ import { CourseModal } from '../components/CourseModal';
++import Logo from '../components/ui/Logo';
+ import type { Course } from '../types/database';
+ import { formatNaira } from '../lib/packages';
+-import Logo from '../components/ui/Logo';
+ 
+ export function AdminDashboard() {
+   const { user } = useAuth();
+@@ -35,38 +23,40 @@ export function AdminDashboard() {
+   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+   const [registrationsCourse, setRegistrationsCourse] = useState<Course | null>(null);
+ 
++  const heroRef = useRef<HTMLDivElement>(null);
++  const statsRef = useRef<HTMLDivElement>(null);
++  const tableRef = useRef<HTMLDivElement>(null);
++
+   const { data: stats } = useAdminStats();
+   const { data: courses, isLoading: coursesLoading } = useAllCourses();
+   const { data: allRegistrations, isLoading: registrationsLoading } = useAllRegistrations();
+   const deleteMutation = useDeleteCourse();
+ 
+-  if (!user || user.role !== 'admin') {
+-    return <Navigate to="/dashboard" replace />;
+-  }
++  useEffect(() => {
++    const ctx = gsap.context(() => {
++      gsap.from(heroRef.current, { y: 20, opacity: 0, duration: 0.6, ease: 'power3.out' });
++      gsap.from(statsRef.current?.children ?? [], { y: 16, opacity: 0, duration: 0.5, ease: 'power3.out', stagger: 0.08, delay: 0.2 });
++      gsap.from(tableRef.current, { y: 20, opacity: 0, duration: 0.5, ease: 'power3.out', delay: 0.45 });
++    });
++    return () => ctx.revert();
++  }, []);
++
++  if (!user || user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+ 
+   const filteredCourses = courses?.filter(
+-    (course) =>
+-      course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+-      course.title.toLowerCase().includes(searchQuery.toLowerCase())
++    (c) => c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
++            c.title.toLowerCase().includes(searchQuery.toLowerCase())
+   );
+ 
+-  const courseRegistrations =
+-    allRegistrations?.filter((registration) => registration.course.id === registrationsCourse?.id) ||
+-    [];
+-
+-  const handleEdit = (course: Course) => {
+-    setSelectedCourse(course);
+-    setShowEditModal(true);
+-  };
++  const courseRegistrations = allRegistrations?.filter(
++    (r) => r.course.id === registrationsCourse?.id
++  ) || [];
+ 
+-  const handleDelete = (course: Course) => {
+-    setCourseToDelete(course);
+-    setShowDeleteModal(true);
+-  };
++  const handleEdit = (course: Course) => { setSelectedCourse(course); setShowEditModal(true); };
++  const handleDelete = (course: Course) => { setCourseToDelete(course); setShowDeleteModal(true); };
+ 
+   const confirmDelete = async () => {
+     if (!courseToDelete) return;
+-
+     try {
+       await deleteMutation.mutateAsync(courseToDelete.id);
+       toast.success('Course deleted successfully');
+@@ -77,241 +67,190 @@ export function AdminDashboard() {
+     }
+   };
+ 
++  const statCards = [
++    { label: 'Total Students', value: stats?.totalStudents || 0, icon: Users, color: 'brand' },
++    { label: 'Total Courses', value: stats?.totalCourses || 0, icon: Logo, color: 'surface', isLogo: true },
++    { label: 'Registrations', value: stats?.totalRegistrations || 0, icon: Calendar, color: 'warning' },
++    { label: 'Total Slots', value: stats?.totalSlots || 0, icon: TrendingUp, color: 'success' },
++  ];
++
+   return (
+     <DashboardLayout>
+-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+-          <div>
+-            <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-              Admin Dashboard
+-            </h1>
+-            <p className="text-surface-500 dark:text-surface-400 mt-1">
+-              Manage courses, slot capacity, payments, and registrations.
+-            </p>
+-          </div>
+-          <Button onClick={() => setShowCreateModal(true)} icon={<Plus className="w-4 h-4" />}>
+-            Add Course
+-          </Button>
+-        </div>
++      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 relative">
++        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(99,102,241,0.08)_0%,transparent_70%)]" />
+ 
+-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+-          <Card hover padding="md">
+-            <div className="flex items-center justify-between">
+-              <div>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">Total Students</p>
+-                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-                  {stats?.totalStudents || 0}
+-                </p>
+-              </div>
+-              <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-950/50 flex items-center justify-center">
+-                <Users className="w-6 h-6 text-brand-600 dark:text-brand-400" />
+-              </div>
+-            </div>
+-          </Card>
++        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+ 
+-          <Card hover padding="md">
+-            <div className="flex items-center justify-between">
+-              <div>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">Total Courses</p>
+-                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-                  {stats?.totalCourses || 0}
+-                </p>
+-              </div>
+-              <div className="w-12 h-12 rounded-xl bg-success-100 dark:bg-success-950/50 flex items-center justify-center">
+-                <Logo />
++          {/* Header */}
++          <div ref={heroRef} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
++            <div className="flex items-center gap-3">
++              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-glow">
++                <Shield className="w-5 h-5 text-white" aria-hidden="true" />
+               </div>
+-            </div>
+-          </Card>
+-
+-          <Card hover padding="md">
+-            <div className="flex items-center justify-between">
+               <div>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">Registrations</p>
+-                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-                  {stats?.totalRegistrations || 0}
+-                </p>
+-              </div>
+-              <div className="w-12 h-12 rounded-xl bg-warning-100 dark:bg-warning-950/50 flex items-center justify-center">
+-                <Calendar className="w-6 h-6 text-warning-600 dark:text-warning-400" />
++                <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">Admin Dashboard</h1>
++                <p className="text-sm text-surface-500 mt-0.5">Manage courses, payments, and registrations.</p>
+               </div>
+             </div>
+-          </Card>
++            <Button
++              onClick={() => setShowCreateModal(true)}
++              icon={<Plus className="w-4 h-4" aria-hidden="true" />}
++              className="shadow-glow"
++            >
++              Add Course
++            </Button>
++          </div>
+ 
+-          <Card hover padding="md">
+-            <div className="flex items-center justify-between">
+-              <div>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">Total Slots</p>
+-                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-                  {stats?.totalSlots || 0}
+-                </p>
+-              </div>
+-              <div className="w-12 h-12 rounded-xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+-                <TrendingUp className="w-6 h-6 text-surface-600 dark:text-surface-400" />
++          {/* Stats */}
++          <div ref={statsRef} className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
++            {statCards.map(({ label, value, icon: Icon, color, isLogo }) => (
++              <div
++                key={label}
++                className="relative overflow-hidden rounded-2xl bg-white dark:bg-surface-900/60 border border-surface-200 dark:border-surface-800/60 p-5 hover:border-surface-300 dark:hover:border-surface-700/80 transition-colors duration-200 shadow-soft"
++              >
++                <div className="flex items-center justify-between">
++                  <div>
++                    <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-1">{label}</p>
++                    <p className="text-3xl font-bold text-surface-900 dark:text-surface-50">{value}</p>
++                  </div>
++                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
++                    color === 'brand' ? 'bg-brand-100 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400' :
++                    color === 'warning' ? 'bg-warning-100 dark:bg-warning-500/10 text-warning-600 dark:text-warning-400' :
++                    color === 'success' ? 'bg-success-100 dark:bg-success-500/10 text-success-600 dark:text-success-400' :
++                    'bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400'
++                  }`}>
++                    {isLogo ? <Logo size={28} /> : <Icon className="w-5 h-5" aria-hidden="true" />}
++                  </div>
++                </div>
++                <div className={`absolute inset-x-0 bottom-0 h-px ${
++                  color === 'brand' ? 'bg-gradient-to-r from-transparent via-brand-500/40 to-transparent' :
++                  color === 'warning' ? 'bg-gradient-to-r from-transparent via-warning-500/40 to-transparent' :
++                  color === 'success' ? 'bg-gradient-to-r from-transparent via-success-500/40 to-transparent' :
++                  'bg-gradient-to-r from-transparent via-surface-300/60 dark:via-surface-700/40 to-transparent'
++                }`} />
+               </div>
+-            </div>
+-          </Card>
+-        </div>
++            ))}
++          </div>
+ 
+-        <Card padding="none">
+-          <div className="p-6 border-b border-surface-200 dark:border-surface-800">
+-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
++          {/* Course management table */}
++          <div ref={tableRef} className="rounded-2xl bg-white dark:bg-surface-900/60 border border-surface-200 dark:border-surface-800/60 shadow-soft overflow-hidden">
++            <div className="px-6 py-5 border-b border-surface-200 dark:border-surface-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+               <div>
+-                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+-                  Course Management
+-                </h2>
+-                <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
+-                  Open a course to view students and payment details.
+-                </p>
++                <h2 className="text-base font-semibold text-surface-900 dark:text-surface-100">Course Management</h2>
++                <p className="text-xs text-surface-500 mt-1">Open a course to view students and payment details.</p>
+               </div>
+               <div className="relative">
+-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
++                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 pointer-events-none" aria-hidden="true" />
+                 <input
+                   type="text"
+                   placeholder="Search courses..."
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+-                  className="w-full sm:w-64 h-10 pl-10 pr-4 rounded-xl bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
++                  className="w-full sm:w-60 h-10 pl-10 pr-4 rounded-xl bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-600 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                 />
+               </div>
+             </div>
+-          </div>
+ 
+-          {coursesLoading ? (
+-            <div className="p-6">
+-              <TableSkeleton rows={5} />
+-            </div>
+-          ) : filteredCourses?.length === 0 ? (
+-            <EmptyState
+-              icon={<Logo />}
+-              title={searchQuery ? 'No courses found' : 'No courses yet'}
+-              description={
+-                searchQuery
+-                  ? 'Try a different search term'
+-                  : 'Create your first course to get started'
+-              }
+-              action={
+-                !searchQuery && (
+-                  <Button onClick={() => setShowCreateModal(true)} icon={<Plus className="w-4 h-4" />}>
+-                    Add Course
+-                  </Button>
+-                )
+-              }
+-            />
+-          ) : (
+-            <div className="overflow-x-auto">
+-              <table className="w-full">
+-                <thead className="bg-surface-50 dark:bg-surface-850">
+-                  <tr>
+-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
+-                      Course
+-                    </th>
+-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
+-                      Status
+-                    </th>
+-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
+-                      Slots
+-                    </th>
+-                    <th className="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
+-                      Created
+-                    </th>
+-                    <th className="px-6 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase">
+-                      Actions
+-                    </th>
+-                  </tr>
+-                </thead>
+-                <tbody className="divide-y divide-surface-200 dark:divide-surface-800">
+-                  {filteredCourses?.map((course) => (
+-                    <tr
+-                      key={course.id}
+-                      className="hover:bg-surface-50 dark:hover:bg-surface-850 transition-colors"
+-                    >
+-                      <td className="px-6 py-4">
+-                        <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 mb-1">
+-                          {course.code}
+-                        </span>
+-                        <p className="text-sm font-medium text-surface-900 dark:text-surface-100">
+-                          {course.title}
+-                        </p>
+-                      </td>
+-                      <td className="px-6 py-4">
+-                        <Badge variant={course.registration_open ? 'success' : 'error'}>
+-                          {course.registration_open ? 'Open' : 'Closed'}
+-                        </Badge>
+-                      </td>
+-                      <td className="px-6 py-4 text-sm text-surface-600 dark:text-surface-400">
+-                        {course.max_slots} slots
+-                      </td>
+-                      <td className="px-6 py-4 text-sm text-surface-500 dark:text-surface-400">
+-                        {new Date(course.created_at).toLocaleDateString()}
+-                      </td>
+-                      <td className="px-6 py-4 text-right">
+-                        <div className="flex items-center justify-end gap-1">
+-                          <Button
+-                            variant="ghost"
+-                            size="sm"
+-                            onClick={() => setRegistrationsCourse(course)}
+-                            className="p-2 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/50"
+-                            aria-label={`View registrations for ${course.title}`}
+-                            title="View registrations"
+-                          >
+-                            <Users className="w-4 h-4" />
+-                          </Button>
+-                          <Button
+-                            variant="ghost"
+-                            size="sm"
+-                            onClick={() => handleEdit(course)}
+-                            className="p-2"
+-                            aria-label={`Edit ${course.title}`}
+-                            title="Edit course"
+-                          >
+-                            <Pencil className="w-4 h-4" />
+-                          </Button>
+-                          <Button
+-                            variant="ghost"
+-                            size="sm"
+-                            onClick={() => handleDelete(course)}
+-                            className="p-2 text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-950/50"
+-                            aria-label={`Delete ${course.title}`}
+-                            title="Delete course"
+-                          >
+-                            <Trash2 className="w-4 h-4" />
+-                          </Button>
+-                        </div>
+-                      </td>
++            {coursesLoading ? (
++              <div className="p-6"><TableSkeleton rows={5} /></div>
++            ) : filteredCourses?.length === 0 ? (
++              <EmptyState
++                icon={<Logo />}
++                title={searchQuery ? 'No courses found' : 'No courses yet'}
++                description={searchQuery ? 'Try a different search term' : 'Create your first course to get started'}
++                action={!searchQuery && (
++                  <Button onClick={() => setShowCreateModal(true)} icon={<Plus className="w-4 h-4" />}>Add Course</Button>
++                )}
++              />
++            ) : (
++              <div className="overflow-x-auto">
++                <table className="w-full">
++                  <thead className="bg-surface-50 dark:bg-surface-900/80 border-b border-surface-200 dark:border-surface-800/60">
++                    <tr>
++                      {['Course', 'Status', 'Slots', 'Created', 'Actions'].map((h, i) => (
++                        <th key={h} className={`px-6 py-3 text-xs font-semibold text-surface-500 uppercase tracking-wider ${i === 4 ? 'text-right' : 'text-left'}`}>
++                          {h}
++                        </th>
++                      ))}
+                     </tr>
+-                  ))}
+-                </tbody>
+-              </table>
+-            </div>
+-          )}
+-        </Card>
++                  </thead>
++                  <tbody className="divide-y divide-surface-200 dark:divide-surface-800/40">
++                    {filteredCourses?.map((course) => (
++                      <tr key={course.id} className="hover:bg-surface-50 dark:hover:bg-surface-800/30 transition-colors duration-150">
++                        <td className="px-6 py-4">
++                          <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-lg bg-brand-100 dark:bg-brand-500/10 text-brand-700 dark:text-brand-400 mb-1">
++                            {course.code}
++                          </span>
++                          <p className="text-sm font-medium text-surface-900 dark:text-surface-100">{course.title}</p>
++                        </td>
++                        <td className="px-6 py-4">
++                          <Badge variant={course.registration_open ? 'success' : 'error'}>
++                            {course.registration_open ? 'Open' : 'Closed'}
++                          </Badge>
++                        </td>
++                        <td className="px-6 py-4 text-sm text-surface-400">{course.max_slots} slots</td>
++                        <td className="px-6 py-4 text-sm text-surface-500">
++                          {new Date(course.created_at).toLocaleDateString()}
++                        </td>
++                        <td className="px-6 py-4 text-right">
++                          <div className="flex items-center justify-end gap-1">
++                            <Button
++                              variant="ghost" size="sm"
++                              onClick={() => setRegistrationsCourse(course)}
++                              className="p-2 text-brand-400 hover:bg-brand-500/10"
++                              aria-label={`View registrations for ${course.title}`}
++                              title="View registrations"
++                            >
++                              <Users className="w-4 h-4" aria-hidden="true" />
++                            </Button>
++                            <Button
++                              variant="ghost" size="sm"
++                              onClick={() => handleEdit(course)}
++                              className="p-2 text-surface-400 hover:bg-surface-700/40"
++                              aria-label={`Edit ${course.title}`}
++                              title="Edit course"
++                            >
++                              <Pencil className="w-4 h-4" aria-hidden="true" />
++                            </Button>
++                            <Button
++                              variant="ghost" size="sm"
++                              onClick={() => handleDelete(course)}
++                              className="p-2 text-error-500 hover:bg-error-500/10"
++                              aria-label={`Delete ${course.title}`}
++                              title="Delete course"
++                            >
++                              <Trash2 className="w-4 h-4" aria-hidden="true" />
++                            </Button>
++                          </div>
++                        </td>
++                      </tr>
++                    ))}
++                  </tbody>
++                </table>
++              </div>
++            )}
++          </div>
++        </div>
+       </div>
+ 
+       <CourseModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
+-
+       <CourseModal
+         isOpen={showEditModal}
+-        onClose={() => {
+-          setShowEditModal(false);
+-          setSelectedCourse(null);
+-        }}
++        onClose={() => { setShowEditModal(false); setSelectedCourse(null); }}
+         course={selectedCourse}
+       />
+-
+       <ConfirmModal
+         isOpen={showDeleteModal}
+-        onClose={() => {
+-          setShowDeleteModal(false);
+-          setCourseToDelete(null);
+-        }}
++        onClose={() => { setShowDeleteModal(false); setCourseToDelete(null); }}
+         onConfirm={confirmDelete}
+         title="Delete Course"
+-        description={`Are you sure you want to delete "${courseToDelete?.title}"? This action cannot be undone and will remove all associated registrations.`}
++        description={`Are you sure you want to delete "${courseToDelete?.title}"? This cannot be undone.`}
+         confirmText="Delete"
+         variant="danger"
+         loading={deleteMutation.isPending}
+       />
+ 
++      {/* Registrations modal */}
+       <Modal
+         isOpen={!!registrationsCourse}
+         onClose={() => setRegistrationsCourse(null)}
+@@ -323,10 +262,8 @@ export function AdminDashboard() {
+           <TableSkeleton rows={4} />
+         ) : courseRegistrations.length === 0 ? (
+           <div className="text-center py-12">
+-            <Users className="w-12 h-12 text-surface-300 dark:text-surface-700 mx-auto mb-4" />
+-            <p className="text-surface-500 dark:text-surface-400">
+-              No students registered yet for this course.
+-            </p>
++            <Users className="w-12 h-12 text-surface-700 mx-auto mb-4" aria-hidden="true" />
++            <p className="text-surface-500">No students registered yet for this course.</p>
+           </div>
+         ) : (
+           <div className="overflow-x-auto max-h-[420px] overflow-y-auto pr-1">
+@@ -346,18 +283,12 @@ export function AdminDashboard() {
+                   <tr key={registration.id} className="text-surface-900 dark:text-surface-100">
+                     <td className="py-3 pr-4">
+                       <p className="font-medium">{registration.user?.full_name || 'Unknown User'}</p>
+-                      <p className="text-xs text-surface-500 dark:text-surface-400">
+-                        {registration.user?.email || 'No email'}
+-                      </p>
++                      <p className="text-xs text-surface-500 dark:text-surface-400">{registration.user?.email || 'No email'}</p>
+                       {registration.user?.phone && (
+-                        <p className="text-xs text-surface-500 dark:text-surface-400">
+-                          {registration.user.phone}
+-                        </p>
++                        <p className="text-xs text-surface-500 dark:text-surface-400">{registration.user.phone}</p>
+                       )}
+                       {registration.user?.department && (
+-                        <p className="text-xs text-brand-600 dark:text-brand-400 font-medium">
+-                          {registration.user.department}
+-                        </p>
++                        <p className="text-xs text-brand-600 dark:text-brand-400 font-medium">{registration.user.department}</p>
+                       )}
+                     </td>
+                     <td className="py-3 px-4">
+@@ -365,31 +296,18 @@ export function AdminDashboard() {
+                         {registration.package_type}
+                       </Badge>
+                     </td>
+-                    <td
+-                      className="py-3 px-4 text-xs text-surface-600 dark:text-surface-400 max-w-[180px]"
+-                      title={registration.delivery_location}
+-                    >
++                    <td className="py-3 px-4 text-xs text-surface-600 dark:text-surface-400 max-w-[180px]" title={registration.delivery_location}>
+                       <p className="truncate">{registration.delivery_location}</p>
+                       {registration.delivery_time && (
+                         <p className="text-[10px] text-brand-600 dark:text-brand-400 mt-0.5">
+-                          {new Date(registration.delivery_time).toLocaleString('en-NG', {
+-                            dateStyle: 'medium',
+-                            timeStyle: 'short',
+-                          })}
++                          {new Date(registration.delivery_time).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}
+                         </p>
+                       )}
+                     </td>
+                     <td className="py-3 px-4">
+-                      <p className="font-semibold text-xs">
+-                        {formatNaira(registration.amount_kobo)}
+-                      </p>
+-                      <p className="text-[10px] capitalize text-surface-500 dark:text-surface-400">
+-                        {registration.payment_status}
+-                      </p>
+-                      <p
+-                        className="text-[10px] text-surface-500 dark:text-surface-400 truncate max-w-[120px]"
+-                        title={registration.payment_reference || ''}
+-                      >
++                      <p className="font-semibold text-xs">{formatNaira(registration.amount_kobo)}</p>
++                      <p className="text-[10px] capitalize text-surface-500 dark:text-surface-400">{registration.payment_status}</p>
++                      <p className="text-[10px] text-surface-500 dark:text-surface-400 truncate max-w-[120px]" title={registration.payment_reference || ''}>
+                         Ref: {registration.payment_reference || 'N/A'}
+                       </p>
+                     </td>
+@@ -403,13 +321,13 @@ export function AdminDashboard() {
+                             className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                             title="View lab guidelines"
+                           >
+-                            <Paperclip className="w-3 h-3" />
++                            <Paperclip className="w-3 h-3" aria-hidden="true" />
+                             View
+                           </a>
+                           <button
+                             type="button"
+                             title="Download lab guidelines"
+-                            className="text-xs text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 cursor-pointer"
++                            className="text-xs text-surface-500 dark:text-surface-400 hover:text-surface-200 cursor-pointer transition-colors"
+                             onClick={async () => {
+                               try {
+                                 const res = await fetch(registration.outline_url!);
+diff --git a/src/pages/CourseCatalogPage.tsx b/src/pages/CourseCatalogPage.tsx
+index 81f42ab..9e15163 100644
+--- a/src/pages/CourseCatalogPage.tsx
++++ b/src/pages/CourseCatalogPage.tsx
+@@ -1,6 +1,7 @@
+-import { useState } from 'react';
++import { useEffect, useRef, useState } from 'react';
+ import { Link } from 'react-router-dom';
+-import { Search, AlertCircle, ArrowRight } from 'lucide-react';
++import { AlertCircle, ArrowRight, Search } from 'lucide-react';
++import gsap from 'gsap';
+ import { useCatalogCourses, useRegisterForCourse } from '../hooks';
+ import { useAuth } from '../contexts/AuthContext';
+ import { useToast } from '../contexts/ToastContext';
+@@ -13,25 +14,39 @@ import type { Course } from '../types/database';
+ 
+ export function CourseCatalogPage() {
+   const { user } = useAuth();
+-  const [searchQuery, setSearchQuery] = useState('');
+   const toast = useToast();
++  const [searchQuery, setSearchQuery] = useState('');
+   const [selectedCourseForReg, setSelectedCourseForReg] = useState<Course | null>(null);
+   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
+ 
++  const heroRef = useRef<HTMLDivElement>(null);
++  const gridRef = useRef<HTMLDivElement>(null);
++
+   const { data: courses, isLoading } = useCatalogCourses(user?.id);
+   const registerMutation = useRegisterForCourse();
+ 
++  useEffect(() => {
++    const ctx = gsap.context(() => {
++      gsap.from(heroRef.current, { y: 20, opacity: 0, duration: 0.7, ease: 'power3.out' });
++    });
++    return () => ctx.revert();
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && gridRef.current?.children.length) {
++      gsap.from(Array.from(gridRef.current.children), {
++        y: 16, opacity: 0, duration: 0.4, ease: 'power3.out', stagger: 0.06,
++      });
++    }
++  }, [isLoading]);
++
+   const filteredCourses = courses?.filter(
+-    (course) =>
+-      course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+-      course.title.toLowerCase().includes(searchQuery.toLowerCase())
++    (c) => c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
++            c.title.toLowerCase().includes(searchQuery.toLowerCase())
+   );
+ 
+   const handleRegisterClick = (courseId: string) => {
+-    if (!user) {
+-      toast.warning('Please sign in to register');
+-      return;
+-    }
++    if (!user) { toast.warning('Please sign in to register'); return; }
+     const course = courses?.find((c) => c.id === courseId);
+     if (!course) return;
+     setSelectedCourseForReg(course);
+@@ -45,7 +60,6 @@ export function CourseCatalogPage() {
+     amountKobo: number;
+   }) => {
+     if (!selectedCourseForReg || !user) return;
+-
+     try {
+       await registerMutation.mutateAsync({
+         userId: user.id,
+@@ -65,93 +79,90 @@ export function CourseCatalogPage() {
+ 
+   return (
+     <Layout>
+-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+-        <div className="text-center mb-12">
+-          <h1 className="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-surface-100 mb-4">
+-            Course Catalog
+-          </h1>
+-          <p className="text-lg text-surface-600 dark:text-surface-400 max-w-2xl mx-auto mb-8">
+-            Browse lab courses, check remaining slots, and register when registration is open.
+-          </p>
+-
+-          <div className="max-w-md mx-auto relative">
+-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+-            <input
+-              type="text"
+-              placeholder="Search courses by code or name..."
+-              value={searchQuery}
+-              onChange={(e) => setSearchQuery(e.target.value)}
+-              className="w-full h-12 pl-12 pr-4 rounded-xl bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+-            />
++      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 relative">
++        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(99,102,241,0.1)_0%,transparent_65%)]" />
++
++        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
++
++          {/* Hero */}
++          <div ref={heroRef} className="text-center mb-12">
++            <h1 className="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-surface-50 tracking-tight mb-4">
++              Course Catalog
++            </h1>
++            <p className="text-surface-500 dark:text-surface-400 max-w-xl mx-auto mb-8 leading-relaxed">
++              Browse lab courses, check remaining slots, and register when registration is open.
++            </p>
++
++            {/* Search */}
++            <div className="max-w-md mx-auto relative">
++              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 pointer-events-none" aria-hidden="true" />
++              <input
++                type="text"
++                placeholder="Search by course code or name…"
++                value={searchQuery}
++                onChange={(e) => setSearchQuery(e.target.value)}
++                className="w-full h-12 pl-11 pr-4 rounded-xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-600 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors shadow-soft"
++              />
++            </div>
++
++            {/* Guest notice */}
++            {!user && (
++              <div className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-sm text-brand-400">
++                <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
++                <span>
++                  <Link to="/login" className="font-semibold underline hover:text-brand-300 transition-colors cursor-pointer">
++                    Sign in
++                  </Link>{' '}
++                  to register for courses
++                </span>
++              </div>
++            )}
+           </div>
+ 
+-          {!user && (
+-            <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800">
+-              <AlertCircle className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+-              <span className="text-sm text-brand-700 dark:text-brand-400">
+-                <Link to="/login" className="font-medium underline cursor-pointer">
+-                  Sign in
+-                </Link>{' '}
+-                to register for courses
+-              </span>
++          {/* Grid */}
++          {isLoading ? (
++            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
++              {Array.from({ length: 6 }).map((_, i) => <CourseCardSkeleton key={i} />)}
++            </div>
++          ) : filteredCourses?.length === 0 ? (
++            <EmptyState
++              icon={<Logo />}
++              title={searchQuery ? 'No courses found' : 'No courses available'}
++              description={searchQuery ? 'Try adjusting your search' : 'Check back later for new course offerings'}
++              action={searchQuery && (
++                <Button variant="outline" onClick={() => setSearchQuery('')}>Clear search</Button>
++              )}
++            />
++          ) : (
++            <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
++              {filteredCourses?.map((course) => (
++                <CourseCard
++                  key={course.id}
++                  course={course}
++                  onRegister={handleRegisterClick}
++                  isRegistering={registerMutation.isPending}
++                  showActions={!!user}
++                />
++              ))}
+             </div>
+           )}
+-        </div>
+ 
+-        {isLoading ? (
+-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+-            {Array.from({ length: 6 }).map((_, i) => (
+-              <CourseCardSkeleton key={i} />
+-            ))}
+-          </div>
+-        ) : filteredCourses?.length === 0 ? (
+-          <EmptyState
+-            icon={<Logo />}
+-            title={searchQuery ? 'No courses found' : 'No courses available'}
+-            description={
+-              searchQuery
+-                ? 'Try adjusting your search terms'
+-                : 'Check back later for new course offerings'
+-            }
+-            action={
+-              searchQuery && (
+-                <Button variant="outline" onClick={() => setSearchQuery('')}>
+-                  Clear search
++          {/* Link to dashboard */}
++          {user?.role === 'student' && (
++            <div className="mt-12 text-center">
++              <Link to="/dashboard">
++                <Button variant="outline" icon={<ArrowRight className="w-4 h-4" aria-hidden="true" />} iconPosition="right">
++                  View my registrations
+                 </Button>
+-              )
+-            }
+-          />
+-        ) : (
+-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+-            {filteredCourses?.map((course) => (
+-              <CourseCard
+-                key={course.id}
+-                course={course}
+-                onRegister={handleRegisterClick}
+-                isRegistering={registerMutation.isPending}
+-                showActions={!!user}
+-              />
+-            ))}
+-          </div>
+-        )}
+-
+-        {user && user.role === 'student' && (
+-          <div className="mt-12 text-center">
+-            <Link to="/dashboard">
+-              <Button variant="outline" icon={<ArrowRight className="w-4 h-4" />} iconPosition="right">
+-                View My registrations
+-              </Button>
+-            </Link>
+-          </div>
+-        )}
++              </Link>
++            </div>
++          )}
++        </div>
+       </div>
+ 
+       <RegisterPackageModal
+         isOpen={isPackageModalOpen}
+-        onClose={() => {
+-          setIsPackageModalOpen(false);
+-          setSelectedCourseForReg(null);
+-        }}
++        onClose={() => { setIsPackageModalOpen(false); setSelectedCourseForReg(null); }}
+         course={selectedCourseForReg}
+         onRegisterComplete={handleRegisterComplete}
+         isRegistering={registerMutation.isPending}
+diff --git a/src/pages/SettingsPage.tsx b/src/pages/SettingsPage.tsx
+index 81729aa..548d4ee 100644
+--- a/src/pages/SettingsPage.tsx
++++ b/src/pages/SettingsPage.tsx
+@@ -1,107 +1,103 @@
+-import { useState, useEffect } from 'react';
++import { useEffect, useRef, useState } from 'react';
+ import { Navigate } from 'react-router-dom';
+-import { User, Mail, Shield, Save } from 'lucide-react';
++import { Mail, Save, Settings, Shield, User } from 'lucide-react';
++import gsap from 'gsap';
+ import { useAuth } from '../contexts/AuthContext';
+ import { useToast } from '../contexts/ToastContext';
+ import { DashboardLayout } from '../components/layout';
+-import { Button, Input, Card, Badge } from '../components/ui';
++import { Badge, Button, Input } from '../components/ui';
+ 
+ export function SettingsPage() {
+   const { user, profile, profileLoading, updateProfile } = useAuth();
+   const toast = useToast();
+   const [fullName, setFullName] = useState('');
+   const [saving, setSaving] = useState(false);
++  const cardRef = useRef<HTMLDivElement>(null);
++  const headerRef = useRef<HTMLDivElement>(null);
+ 
+   useEffect(() => {
+-    if (user) {
+-      setFullName(user.full_name);
+-    }
++    if (user) setFullName(user.full_name);
+   }, [user]);
+ 
+-  if (!user) {
+-    return <Navigate to="/login" replace />;
+-  }
++  useEffect(() => {
++    const ctx = gsap.context(() => {
++      gsap.from(headerRef.current, { y: 20, opacity: 0, duration: 0.6, ease: 'power3.out' });
++      gsap.from(cardRef.current, { y: 24, opacity: 0, duration: 0.6, ease: 'power3.out', delay: 0.15 });
++    });
++    return () => ctx.revert();
++  }, []);
++
++  if (!user) return <Navigate to="/login" replace />;
+ 
+   const handleSave = async (e: React.FormEvent) => {
+     e.preventDefault();
+-
+-    if (!fullName.trim()) {
+-      toast.warning('Full name is required');
+-      return;
+-    }
+-
++    if (!fullName.trim()) { toast.warning('Full name is required'); return; }
+     setSaving(true);
+     const { error } = await updateProfile(fullName.trim());
+     setSaving(false);
+-
+-    if (error) {
+-      toast.error('Failed to update profile', error.message);
+-      return;
+-    }
+-
++    if (error) { toast.error('Failed to update profile', error.message); return; }
+     toast.success('Profile updated successfully');
+   };
+ 
+   return (
+     <DashboardLayout>
+-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+-        <div className="mb-8">
+-          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">Settings</h1>
+-          <p className="text-surface-500 dark:text-surface-400 mt-1">
+-            Manage your account details and registration profile.
+-          </p>
+-        </div>
++      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 relative">
++        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(99,102,241,0.06)_0%,transparent_70%)]" />
+ 
+-        <Card padding="lg">
+-          <form onSubmit={handleSave} className="space-y-6">
+-            <div className="flex items-center gap-4 pb-6 border-b border-surface-200 dark:border-surface-800">
+-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+-                <User className="w-7 h-7 text-white" />
+-              </div>
+-              <div>
+-                <p className="font-semibold text-surface-900 dark:text-surface-100">{user.full_name}</p>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">{user.email}</p>
+-                <Badge variant="info" size="sm" className="mt-2 capitalize">
+-                  <Shield className="w-3 h-3" />
+-                  {profileLoading && !profile ? 'Loading' : profile?.role ?? user.role}
+-                </Badge>
+-              </div>
++        <div className="relative max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
++          <div ref={headerRef} className="flex items-center gap-3 mb-8">
++            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-glow">
++              <Settings className="w-5 h-5 text-white" aria-hidden="true" />
+             </div>
+-
+-            <Input
+-              label="Full name"
+-              type="text"
+-              value={fullName}
+-              onChange={(e) => setFullName(e.target.value)}
+-              placeholder="Your full name"
+-              icon={<User className="w-5 h-5" />}
+-            />
+-
+             <div>
+-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+-                Email
+-              </label>
+-              <div className="flex items-center gap-3 h-11 px-4 rounded-xl bg-surface-50 dark:bg-surface-850 border border-surface-200 dark:border-surface-800 text-surface-500 dark:text-surface-400">
+-                <Mail className="w-5 h-5" />
+-                <span className="text-sm">{user.email}</span>
+-              </div>
+-              <p className="mt-2 text-xs text-surface-400 dark:text-surface-500">
+-                Contact your administrator to change your email address.
+-              </p>
++              <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">Settings</h1>
++              <p className="text-sm text-surface-500 mt-0.5">Manage your account details and registration profile.</p>
+             </div>
++          </div>
+ 
+-            <div className="pt-2">
+-              <Button
+-                type="submit"
+-                loading={saving}
+-                icon={<Save className="w-4 h-4" />}
+-                className="cursor-pointer"
+-              >
+-                Save changes
+-              </Button>
++          <div ref={cardRef} className="rounded-2xl bg-white dark:bg-surface-900/60 border border-surface-200 dark:border-surface-800/60 shadow-soft overflow-hidden">
++            {/* Profile header */}
++            <div className="px-6 py-5 bg-gradient-to-r from-brand-50 dark:from-brand-500/5 to-brand-100/50 dark:to-brand-600/5 border-b border-surface-200 dark:border-surface-800/60">
++              <div className="flex items-center gap-4">
++                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-glow shrink-0">
++                  <User className="w-7 h-7 text-white" aria-hidden="true" />
++                </div>
++                <div>
++                  <p className="font-semibold text-surface-900 dark:text-surface-100">{user.full_name}</p>
++                  <p className="text-sm text-surface-500">{user.email}</p>
++                  <Badge variant="info" size="sm" className="mt-2 capitalize inline-flex items-center gap-1">
++                    <Shield className="w-3 h-3" aria-hidden="true" />
++                    {profileLoading && !profile ? 'Loading…' : profile?.role ?? user.role}
++                  </Badge>
++                </div>
++              </div>
+             </div>
+-          </form>
+-        </Card>
++
++            <form onSubmit={handleSave} className="px-6 py-6 space-y-5">
++              <Input
++                label="Full name"
++                type="text"
++                value={fullName}
++                onChange={(e) => setFullName(e.target.value)}
++                placeholder="Your full name"
++                icon={<User className="w-5 h-5" aria-hidden="true" />}
++              />
++              <div>
++                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Email</label>
++                <div className="flex items-center gap-3 h-11 px-4 rounded-xl bg-surface-50 dark:bg-surface-800/40 border border-surface-200 dark:border-surface-700/40 text-surface-500 select-none">
++                  <Mail className="w-4 h-4 shrink-0" aria-hidden="true" />
++                  <span className="text-sm truncate">{user.email}</span>
++                </div>
++                <p className="mt-1.5 text-xs text-surface-400 dark:text-surface-600">Contact your administrator to change your email address.</p>
++              </div>
++              <div className="pt-2">
++                <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" aria-hidden="true" />} className="shadow-glow cursor-pointer">
++                  Save changes
++                </Button>
++              </div>
++            </form>
++          </div>
++        </div>
+       </div>
+     </DashboardLayout>
+   );
+diff --git a/src/pages/StudentDashboard.tsx b/src/pages/StudentDashboard.tsx
+index 0cc3eca..08f8f47 100644
+--- a/src/pages/StudentDashboard.tsx
++++ b/src/pages/StudentDashboard.tsx
+@@ -100,31 +100,15 @@ export function StudentDashboard() {
+   };
+ 
+   const stats = [
+-    {
+-      label: 'My Registrations',
+-      value: registeredCourses.length,
+-      icon: Calendar,
+-      color: 'brand',
+-    },
+-    {
+-      label: 'Open Slots',
+-      value: availableCourses.filter((c) => c.registration_open && c.remaining_slots > 0).length,
+-      icon: TrendingUp,
+-      color: 'success',
+-    },
+-    {
+-      label: 'Total Courses',
+-      value: courses?.length || 0,
+-      icon: BookOpen,
+-      color: 'surface',
+-    },
++    { label: 'My Registrations', value: registeredCourses.length, icon: Calendar, color: 'brand' },
++    { label: 'Open Slots', value: availableCourses.filter((c) => c.registration_open && c.remaining_slots > 0).length, icon: TrendingUp, color: 'success' },
++    { label: 'Total Courses', value: courses?.length || 0, icon: BookOpen, color: 'surface' },
+   ];
+ 
+   return (
+     <DashboardLayout>
+-      <div className="min-h-screen bg-surface-950 relative">
+-        {/* Ambient glow */}
+-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(99,102,241,0.08)_0%,transparent_70%)]" />
++      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 relative">
++        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(99,102,241,0.06)_0%,transparent_70%)]" />
+ 
+         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+ 
+@@ -135,7 +119,7 @@ export function StudentDashboard() {
+                 <Sparkles className="w-5 h-5 text-white" aria-hidden="true" />
+               </div>
+               <div>
+-                <h1 className="text-2xl font-bold text-surface-50 tracking-tight">
++                <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">
+                   Welcome back, {user.full_name.split(' ')[0]}
+                 </h1>
+                 <p className="text-sm text-surface-500 mt-0.5">
+@@ -150,17 +134,17 @@ export function StudentDashboard() {
+             {stats.map(({ label, value, icon: Icon, color }) => (
+               <div
+                 key={label}
+-                className="relative overflow-hidden rounded-2xl bg-surface-900/60 border border-surface-800/60 backdrop-blur-sm p-5 group hover:border-surface-700/80 transition-colors duration-200"
++                className="relative overflow-hidden rounded-2xl bg-white dark:bg-surface-900/60 border border-surface-200 dark:border-surface-800/60 p-5 hover:border-surface-300 dark:hover:border-surface-700/80 transition-colors duration-200 shadow-soft"
+               >
+                 <div className="flex items-center justify-between">
+                   <div>
+                     <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-1">{label}</p>
+-                    <p className="text-3xl font-bold text-surface-50">{value}</p>
++                    <p className="text-3xl font-bold text-surface-900 dark:text-surface-50">{value}</p>
+                   </div>
+                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+-                    color === 'brand' ? 'bg-brand-500/10 text-brand-400' :
+-                    color === 'success' ? 'bg-success-500/10 text-success-400' :
+-                    'bg-surface-800 text-surface-400'
++                    color === 'brand' ? 'bg-brand-100 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400' :
++                    color === 'success' ? 'bg-success-100 dark:bg-success-500/10 text-success-600 dark:text-success-400' :
++                    'bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400'
+                   }`}>
+                     <Icon className="w-5 h-5" aria-hidden="true" />
+                   </div>
+@@ -168,7 +152,7 @@ export function StudentDashboard() {
+                 <div className={`absolute inset-x-0 bottom-0 h-px ${
+                   color === 'brand' ? 'bg-gradient-to-r from-transparent via-brand-500/40 to-transparent' :
+                   color === 'success' ? 'bg-gradient-to-r from-transparent via-success-500/40 to-transparent' :
+-                  'bg-gradient-to-r from-transparent via-surface-700/40 to-transparent'
++                  'bg-gradient-to-r from-transparent via-surface-300/60 dark:via-surface-700/40 to-transparent'
+                 }`} />
+               </div>
+             ))}
+@@ -179,33 +163,27 @@ export function StudentDashboard() {
+ 
+             {/* Available Courses */}
+             <div className="lg:col-span-2">
+-              <div className="rounded-2xl bg-surface-900/60 border border-surface-800/60 backdrop-blur-sm overflow-hidden">
+-                <div className="px-6 py-5 border-b border-surface-800/60">
+-                  <h2 className="text-base font-semibold text-surface-100">Available Courses</h2>
++              <div className="rounded-2xl bg-white dark:bg-surface-900/60 border border-surface-200 dark:border-surface-800/60 shadow-soft overflow-hidden">
++                <div className="px-6 py-5 border-b border-surface-200 dark:border-surface-800/60">
++                  <h2 className="text-base font-semibold text-surface-900 dark:text-surface-100">Available Courses</h2>
+                   <p className="text-xs text-surface-500 mt-1">Browse open courses and register for service slots</p>
+                 </div>
+                 <div className="p-6">
+                   {coursesLoading ? (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-                      <CourseCardSkeleton />
+-                      <CourseCardSkeleton />
++                      <CourseCardSkeleton /><CourseCardSkeleton />
+                     </div>
+                   ) : availableCourses.length === 0 ? (
+                     <div className="text-center py-14">
+-                      <div className="w-12 h-12 rounded-2xl bg-surface-800/60 flex items-center justify-center mx-auto mb-4">
+-                        <AlertCircle className="w-6 h-6 text-surface-600" aria-hidden="true" />
++                      <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800/60 flex items-center justify-center mx-auto mb-4">
++                        <AlertCircle className="w-6 h-6 text-surface-400 dark:text-surface-600" aria-hidden="true" />
+                       </div>
+                       <p className="text-sm text-surface-500">You're registered for all available courses.</p>
+                     </div>
+                   ) : (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       {availableCourses.map((course) => (
+-                        <CourseCard
+-                          key={course.id}
+-                          course={course}
+-                          onRegister={handleRegisterClick}
+-                          isRegistering={registerMutation.isPending}
+-                        />
++                        <CourseCard key={course.id} course={course} onRegister={handleRegisterClick} isRegistering={registerMutation.isPending} />
+                       ))}
+                     </div>
+                   )}
+@@ -215,60 +193,45 @@ export function StudentDashboard() {
+ 
+             {/* My Registrations */}
+             <div>
+-              <div className="rounded-2xl bg-surface-900/60 border border-surface-800/60 backdrop-blur-sm overflow-hidden">
+-                <div className="px-6 py-5 border-b border-surface-800/60">
+-                  <h2 className="text-base font-semibold text-surface-100">My Registrations</h2>
++              <div className="rounded-2xl bg-white dark:bg-surface-900/60 border border-surface-200 dark:border-surface-800/60 shadow-soft overflow-hidden">
++                <div className="px-6 py-5 border-b border-surface-200 dark:border-surface-800/60">
++                  <h2 className="text-base font-semibold text-surface-900 dark:text-surface-100">My Registrations</h2>
+                   <p className="text-xs text-surface-500 mt-1">Your active slot registrations</p>
+                 </div>
+                 <div className="p-4">
+                   {registrationsLoading ? (
+                     <div className="space-y-3">
+-                      <div className="h-20 bg-surface-800/40 rounded-xl animate-pulse" />
+-                      <div className="h-20 bg-surface-800/40 rounded-xl animate-pulse" />
++                      <div className="h-20 bg-surface-100 dark:bg-surface-800/40 rounded-xl animate-pulse" />
++                      <div className="h-20 bg-surface-100 dark:bg-surface-800/40 rounded-xl animate-pulse" />
+                     </div>
+                   ) : registeredCourses.length === 0 ? (
+                     <div className="text-center py-10">
+-                      <div className="w-10 h-10 rounded-xl bg-surface-800/60 flex items-center justify-center mx-auto mb-3">
+-                        <Clock className="w-5 h-5 text-surface-600" aria-hidden="true" />
++                      <div className="w-10 h-10 rounded-xl bg-surface-100 dark:bg-surface-800/60 flex items-center justify-center mx-auto mb-3">
++                        <Clock className="w-5 h-5 text-surface-400 dark:text-surface-600" aria-hidden="true" />
+                       </div>
+                       <p className="text-xs text-surface-500">No registrations yet. Browse available courses to get started.</p>
+                     </div>
+                   ) : (
+                     <div className="space-y-2">
+                       {registeredCourses.map((course) => (
+-                        <div
+-                          key={course.id}
+-                          className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/40 hover:border-brand-500/30 transition-colors duration-200"
+-                        >
++                        <div key={course.id} className="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/40 border border-surface-200 dark:border-surface-700/40 hover:border-brand-300 dark:hover:border-brand-500/30 transition-colors duration-200">
+                           <div className="flex items-start justify-between mb-2">
+                             <Badge variant="info" size="sm">{course.code}</Badge>
+-                            <Button
+-                              variant="ghost"
+-                              size="sm"
+-                              onClick={() => { setSelectedCourse(course.id); setShowUnregisterModal(true); }}
+-                              className="text-error-500 hover:bg-error-500/10 -mr-1 -mt-1 text-xs"
+-                            >
++                            <Button variant="ghost" size="sm" onClick={() => { setSelectedCourse(course.id); setShowUnregisterModal(true); }} className="text-error-500 hover:bg-error-50 dark:hover:bg-error-500/10 -mr-1 -mt-1 text-xs">
+                               Unregister
+                             </Button>
+                           </div>
+-                          <p className="text-sm font-medium text-surface-100 line-clamp-1 mb-2">{course.title}</p>
++                          <p className="text-sm font-medium text-surface-900 dark:text-surface-100 line-clamp-1 mb-2">{course.title}</p>
+                           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-surface-500">
+                             <span className="capitalize">{course.packageType}</span>
+                             <span>{formatNaira(course.amountKobo)}</span>
+-                            <span className={`capitalize font-medium ${course.paymentStatus === 'paid' ? 'text-success-400' : 'text-warning-400'}`}>
++                            <span className={`capitalize font-medium ${course.paymentStatus === 'paid' ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400'}`}>
+                               {course.paymentStatus}
+                             </span>
+                           </div>
+-                          <p className="text-xs text-surface-600 mt-1 truncate">
+-                            {course.deliveryLocation}
+-                          </p>
++                          <p className="text-xs text-surface-500 mt-1 truncate">{course.deliveryLocation}</p>
+                           {course.outlineUrl && (
+-                            <a
+-                              href={course.outlineUrl}
+-                              target="_blank"
+-                              rel="noopener noreferrer"
+-                              className="inline-flex items-center gap-1 mt-2 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+-                            >
++                            <a href={course.outlineUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs text-brand-600 dark:text-brand-400 hover:underline transition-colors">
+                               <Paperclip className="w-3 h-3" aria-hidden="true" />
+                               View guidelines
+                             </a>
+@@ -284,24 +247,8 @@ export function StudentDashboard() {
+         </div>
+       </div>
+ 
+-      <ConfirmModal
+-        isOpen={showUnregisterModal}
+-        onClose={() => { setShowUnregisterModal(false); setSelectedCourse(null); }}
+-        onConfirm={handleUnregister}
+-        title="Unregister from Course"
+-        description="Are you sure you want to unregister? Your slot will be made available to other students."
+-        confirmText="Unregister"
+-        variant="danger"
+-        loading={unregisterMutation.isPending}
+-      />
+-
+-      <RegisterPackageModal
+-        isOpen={isPackageModalOpen}
+-        onClose={() => { setIsPackageModalOpen(false); setSelectedCourseForReg(null); }}
+-        course={selectedCourseForReg}
+-        onRegisterComplete={handleRegisterComplete}
+-        isRegistering={registerMutation.isPending}
+-      />
++      <ConfirmModal isOpen={showUnregisterModal} onClose={() => { setShowUnregisterModal(false); setSelectedCourse(null); }} onConfirm={handleUnregister} title="Unregister from Course" description="Are you sure you want to unregister? Your slot will be made available to other students." confirmText="Unregister" variant="danger" loading={unregisterMutation.isPending} />
++      <RegisterPackageModal isOpen={isPackageModalOpen} onClose={() => { setIsPackageModalOpen(false); setSelectedCourseForReg(null); }} course={selectedCourseForReg} onRegisterComplete={handleRegisterComplete} isRegistering={registerMutation.isPending} />
+     </DashboardLayout>
+   );
+ }
+-- 
+2.54.0.windows.1
+

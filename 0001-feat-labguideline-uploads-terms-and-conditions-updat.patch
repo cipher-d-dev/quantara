@@ -1,0 +1,2081 @@
+From 1d236b7aafc592b3177ae163f031ef9376116c13 Mon Sep 17 00:00:00 2001
+From: Favour Ejiofor <faveejiofor2009@gmail.com>
+Date: Sat, 20 Jun 2026 03:41:58 +0100
+Subject: [PATCH 1/5] feat: labguideline uploads + terms and conditions update
+
+---
+ TODO.md                                       |   5 +
+ public/logo.svg                               |  20 +
+ server/.env                                   |   5 +-
+ server/src/index.ts                           |  12 +-
+ src/App.tsx                                   |   2 +
+ src/components/RegisterPackageModal.tsx       | 233 ++++++++---
+ src/components/layout/Navbar.tsx              | 242 ++++++-----
+ src/components/ui/DateTimePicker.tsx          | 191 +++++++++
+ src/components/ui/Logo.tsx                    |  90 ++++-
+ src/components/ui/Modal.tsx                   |   6 +-
+ src/components/ui/index.ts                    |   1 +
+ src/hooks/useAdmin.ts                         |  52 ++-
+ src/hooks/useCourses.ts                       |   9 +-
+ src/lib/paystack.ts                           |   4 +
+ src/pages/AdminDashboard.tsx                  |  58 ++-
+ src/pages/PaymentCallbackPage.tsx             |  10 +
+ src/pages/StudentDashboard.tsx                | 378 +++++++++---------
+ src/pages/TermsPage.tsx                       | 156 ++++++++
+ src/pages/index.ts                            |   1 +
+ src/types/database.ts                         |   3 +
+ ...023800_registrations_add_delivery_time.sql |   2 +
+ 21 files changed, 1099 insertions(+), 381 deletions(-)
+ create mode 100644 public/logo.svg
+ create mode 100644 src/components/ui/DateTimePicker.tsx
+ create mode 100644 src/pages/TermsPage.tsx
+ create mode 100644 supabase/migrations/20260620023800_registrations_add_delivery_time.sql
+
+diff --git a/TODO.md b/TODO.md
+index 0c20bd4..e8de4c6 100644
+--- a/TODO.md
++++ b/TODO.md
+@@ -222,6 +222,11 @@ Improve navigation experience on mobile devices.
+ 
+ Cleaner mobile experience and more polished presentation.
+ 
++
++### Important Add On's
++* The current logo for quantara is an image without story, generate an interactive log for quantara and replace the current logo accross all references and add the logo to the emails for payment receipts, and update the logo everywhere applicable
++* Redesign the Dashbord Screen and Admin Screen, Basically all screen aside from the landing page, and signup and login, the design principle is that of the redesign when it came to the login and signup screens, with consistent icons and story telling subtle animations and the other redesign concepts you used
++* When the admin view registred students and their lab guideline, stack the view and download button on top eachother
+ ---
+ 
+ # Recommended Build Order
+diff --git a/public/logo.svg b/public/logo.svg
+new file mode 100644
+index 0000000..dded9f6
+--- /dev/null
++++ b/public/logo.svg
+@@ -0,0 +1,20 @@
++<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
++  <rect width="40" height="40" rx="10" fill="url(#logo-bg)"/>
++  <circle cx="20" cy="20" r="11" stroke="url(#logo-ring)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="56 14" fill="none"/>
++  <circle cx="20" cy="20" r="3" fill="url(#logo-nucleus)"/>
++  <line x1="28" y1="28" x2="32" y2="32" stroke="url(#logo-ring)" stroke-width="2.5" stroke-linecap="round"/>
++  <defs>
++    <linearGradient id="logo-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
++      <stop offset="0%" stop-color="#4f46e5"/>
++      <stop offset="100%" stop-color="#6366f1"/>
++    </linearGradient>
++    <linearGradient id="logo-ring" x1="9" y1="9" x2="31" y2="31" gradientUnits="userSpaceOnUse">
++      <stop offset="0%" stop-color="#c7d2fe"/>
++      <stop offset="100%" stop-color="#e0e7ff"/>
++    </linearGradient>
++    <radialGradient id="logo-nucleus" cx="50%" cy="50%" r="50%">
++      <stop offset="0%" stop-color="#ffffff"/>
++      <stop offset="100%" stop-color="#c7d2fe"/>
++    </radialGradient>
++  </defs>
++</svg>
+diff --git a/server/.env b/server/.env
+index 00430d6..fa5e60a 100644
+--- a/server/.env
++++ b/server/.env
+@@ -7,4 +7,7 @@ VITE_PAYSTACK_CURRENCY=NGN
+ TELEGRAM_BOT_TOKEN=8812703966:AAG2Z3NFsmlEK0DAciFF--HoyNc5-d2cfHU
+ TELEGRAM_CHAT_ID=-5109974919
+ RESEND_FROM=Quantara <receipts@isbmpa.com>
+-RESEND_API_KEY="re_Ay2xEkUh_26DCn1mxKcxyCfEYmN9ZcQP8"
+\ No newline at end of file
++RESEND_API_KEY="re_Ay2xEkUh_26DCn1mxKcxyCfEYmN9ZcQP8"
++
++SUPABASE_URL=https://wrgtdnouvahimgsioisa.supabase.co
++SUPABASE_SERVICE_ROLE_KEY=sb_secret_0kqRs1osu-axaNFy3VTrpw_NKqA7dbW
+\ No newline at end of file
+diff --git a/server/src/index.ts b/server/src/index.ts
+index 49b462f..b41b893 100644
+--- a/server/src/index.ts
++++ b/server/src/index.ts
+@@ -67,9 +67,12 @@ async function sendReceiptEmail(opts: {
+ 
+   const html = `
+     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#09090b;color:#e4e4e7;border-radius:12px;padding:32px;">
+-      <div style="margin-bottom:24px;">
+-        <h1 style="font-size:22px;font-weight:700;color:#ffffff;margin:0 0 4px">Payment Receipt</h1>
+-        <p style="color:#71717a;font-size:14px;margin:0">Quantara Lab Reports</p>
++      <div style="margin-bottom:24px;display:flex;align-items:center;gap:12px;">
++        <img src="https://quantara-labs.vercel.app/logo.svg" alt="Quantara" width="40" height="40" style="border-radius:10px;display:block;" onerror="this.style.display='none'" />
++        <div>
++          <h1 style="font-size:22px;font-weight:700;color:#ffffff;margin:0 0 2px">Payment Receipt</h1>
++          <p style="color:#71717a;font-size:13px;margin:0">Quantara Lab Reports</p>
++        </div>
+       </div>
+       <p style="font-size:15px;color:#a1a1aa;margin:0 0 24px">Hi <strong style="color:#e4e4e7">${opts.studentName}</strong>, your payment was successful. Here's your receipt.</p>
+       <table style="width:100%;border-collapse:collapse;font-size:14px;">
+@@ -153,6 +156,7 @@ app.post("/api/paystack/initialize", async (req, res) => {
+       courseId,
+       userId,
+       deliveryLocation,
++      deliveryTime,
+       outlineUrl,
+       callbackUrl,
+     } = req.body;
+@@ -218,6 +222,7 @@ app.post("/api/paystack/initialize", async (req, res) => {
+             userId,
+             packageType,
+             deliveryLocation,
++            deliveryTime: deliveryTime ?? null,
+             outlineUrl: outlineUrl ?? null,
+           },
+         }),
+@@ -340,6 +345,7 @@ async function verifyPaystackReference(reference: string, res: any) {
+             package_type: metadata.packageType || "basic",
+             delivery_location:
+               metadata.deliveryLocation || "The Engineering Civil Shed",
++            delivery_time: (metadata.deliveryTime as string | null) ?? null,
+             payment_reference: paymentRef,
+             payment_status: "paid",
+             amount_kobo: data.data.amount,
+diff --git a/src/App.tsx b/src/App.tsx
+index 39dd987..7ebc4a1 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -12,6 +12,7 @@ import {
+   CourseCatalogPage,
+   SettingsPage,
+   PaymentCallbackPage,
++  TermsPage,
+ } from './pages';
+ import { Skeleton } from './components/ui';
+ 
+@@ -289,6 +290,7 @@ function AppRoutes() {
+         }
+       />
+       <Route path="/courses" element={<CourseCatalogPage />} />
++      <Route path="/terms" element={<TermsPage />} />
+       <Route
+         path="/payment/callback"
+         element={
+diff --git a/src/components/RegisterPackageModal.tsx b/src/components/RegisterPackageModal.tsx
+index cf84f4c..e1f3ca5 100644
+--- a/src/components/RegisterPackageModal.tsx
++++ b/src/components/RegisterPackageModal.tsx
+@@ -1,11 +1,13 @@
+ import { useEffect, useRef, useState } from 'react';
+-import { CreditCard, MapPin, ShieldCheck, Sparkles, Paperclip, X } from 'lucide-react';
++import { Link } from 'react-router-dom';
++import { CreditCard, MapPin, Clock, ShieldCheck, Sparkles, Paperclip, X } from 'lucide-react';
+ import { useAuth } from '../contexts/AuthContext';
+ import { useToast } from '../contexts/ToastContext';
+ import { Modal } from './ui/Modal';
+ import { Button } from './ui/Button';
+ import { Input } from './ui/Input';
+ import { Select } from './ui/Select';
++import { DateTimePicker } from './ui/DateTimePicker';
+ import { supabase } from '../lib/supabase';
+ import type { Course, RegistrationPackage } from '../types/database';
+ import {
+@@ -50,6 +52,17 @@ export function RegisterPackageModal({
+   const [uploadingOutline, setUploadingOutline] = useState(false);
+   const fileInputRef = useRef<HTMLInputElement>(null);
+   const [paying, setPaying] = useState(false);
++  const [deliveryTime, setDeliveryTime] = useState('');
++  const [confirmOpen, setConfirmOpen] = useState(false);
++  const [termsAgreed, setTermsAgreed] = useState(false);
++
++  // minimum = 2 days from now, formatted for datetime-local input
++  const minDateTime = (() => {
++    const d = new Date();
++    d.setDate(d.getDate() + 2);
++    d.setSeconds(0, 0);
++    return d.toISOString().slice(0, 16);
++  })();
+ 
+   useEffect(() => {
+     if (!isOpen) return;
+@@ -59,6 +72,9 @@ export function RegisterPackageModal({
+     setCustomLocation('');
+     setOutlineFile(null);
+     setPaying(false);
++    setDeliveryTime('');
++    setConfirmOpen(false);
++    setTermsAgreed(false);
+   }, [isOpen, course?.id]);
+ 
+   if (!course || !user) return null;
+@@ -99,16 +115,41 @@ export function RegisterPackageModal({
+       return;
+     }
+ 
+-    // 2. Validate outline required
++    // 2. Validate lab guidelines required
+     if (!outlineFile) {
+-      toast.warning('Please attach your course outline before proceeding');
++      toast.warning('Please attach your lab guidelines before proceeding');
++      return;
++    }
++
++    // 3. Validate delivery time (optional for basic, required for pro)
++    if (packageType === 'pro' && !deliveryTime) {
++      toast.warning('Please select a preferred delivery date and time');
++      return;
++    }
++    if (deliveryTime && new Date(deliveryTime) < new Date(minDateTime)) {
++      toast.warning('Delivery time must be at least 2 days from now');
++      return;
++    }
++
++    // All validated — open confirmation modal
++    setConfirmOpen(true);
++  };
++
++  const handleConfirmPayment = async () => {
++    setConfirmOpen(false);
++
++    let finalLocation: string;
++    try {
++      finalLocation = resolveDeliveryLocation();
++    } catch (e) {
++      toast.warning((e as Error).message);
+       return;
+     }
+ 
+     setPaying(true);
+ 
+     try {
+-      // 3. Upload outline to Supabase Storage
++      // Upload lab guidelines to Supabase Storage
+       setUploadingOutline(true);
+       const ext = outlineFile.name.split('.').pop();
+       const storagePath = `${user!.id}-${course.id}-${Date.now()}.${ext}`;
+@@ -135,6 +176,7 @@ export function RegisterPackageModal({
+         courseId: course.id,
+         userId: user!.id,
+         deliveryLocation: finalLocation,
++        deliveryTime: deliveryTime || null,
+         outlineUrl: publicUrl,
+         callbackUrl,
+       });
+@@ -143,6 +185,7 @@ export function RegisterPackageModal({
+         courseId: course.id,
+         packageType,
+         deliveryLocation: finalLocation,
++        deliveryTime: deliveryTime || null,
+         amountKobo: checkout.amountKobo ?? selectedPackage.amountKobo,
+         returnPath: window.location.pathname || '/dashboard',
+         outlineUrl: publicUrl,
+@@ -157,6 +200,7 @@ export function RegisterPackageModal({
+   };
+ 
+   return (
++    <>
+     <Modal
+       isOpen={isOpen}
+       onClose={onClose}
+@@ -174,56 +218,62 @@ export function RegisterPackageModal({
+           </p>
+         </div>
+ 
+-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+-          {(['basic', 'pro'] as RegistrationPackage[]).map((option) => {
+-            const details = PACKAGE_OPTIONS[option];
+-            const selected = packageType === option;
+-            const Icon = option === 'basic' ? ShieldCheck : Sparkles;
++        <fieldset>
++          <legend className="sr-only">Select package</legend>
++          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
++            {(['basic', 'pro'] as RegistrationPackage[]).map((option) => {
++              const details = PACKAGE_OPTIONS[option];
++              const selected = packageType === option;
++              const Icon = option === 'basic' ? ShieldCheck : Sparkles;
+ 
+-            return (
+-              <button
+-                key={option}
+-                type="button"
+-                onClick={() => handlePackageChange(option)}
+-                className={`text-left p-4 rounded-2xl border transition-colors ${
+-                  selected
+-                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/30'
+-                    : 'border-surface-200 dark:border-surface-800 bg-surface-0 dark:bg-surface-900 hover:border-surface-300 dark:hover:border-surface-700'
+-                }`}
+-              >
+-                <div className="flex items-start justify-between gap-3">
+-                  <div className="w-10 h-10 rounded-xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+-                    <Icon className="w-5 h-5 text-brand-600 dark:text-brand-300" />
++              return (
++                <button
++                  key={option}
++                  type="button"
++                  role="radio"
++                  aria-checked={selected}
++                  onClick={() => handlePackageChange(option)}
++                  className={`text-left p-4 rounded-2xl border transition-colors ${
++                    selected
++                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/30'
++                      : 'border-surface-200 dark:border-surface-800 bg-surface-0 dark:bg-surface-900 hover:border-surface-300 dark:hover:border-surface-700'
++                  }`}
++                >
++                  <div className="flex items-start justify-between gap-3">
++                    <div className="w-10 h-10 rounded-xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
++                      <Icon className="w-5 h-5 text-brand-600 dark:text-brand-300" aria-hidden="true" />
++                    </div>
++                    <p className="text-base font-bold text-surface-900 dark:text-surface-100">
++                      {formatNaira(details.amountKobo)}
++                    </p>
+                   </div>
+-                  <p className="text-base font-bold text-surface-900 dark:text-surface-100">
+-                    {formatNaira(details.amountKobo)}
++                  <p className="mt-4 font-semibold text-surface-900 dark:text-surface-100">
++                    {details.label}
+                   </p>
+-                </div>
+-                <p className="mt-4 font-semibold text-surface-900 dark:text-surface-100">
+-                  {details.label}
+-                </p>
+-                <p className="mt-1 text-sm text-surface-500 dark:text-surface-400 leading-relaxed">
+-                  {details.description}
+-                </p>
+-              </button>
+-            );
+-          })}
+-        </div>
++                  <p className="mt-1 text-sm text-surface-500 dark:text-surface-400 leading-relaxed">
++                    {details.description}
++                  </p>
++                </button>
++              );
++            })}
++          </div>
++        </fieldset>
+ 
+         <div className="space-y-3">
+-          <div className="flex items-center gap-2 text-sm font-semibold text-surface-900 dark:text-surface-100">
+-            <MapPin className="w-4 h-4 text-brand-500" />
++          <p id="delivery-location-label" className="flex items-center gap-2 text-sm font-semibold text-surface-900 dark:text-surface-100">
++            <MapPin className="w-4 h-4 text-brand-500" aria-hidden="true" />
+             Delivery Location
+-          </div>
++          </p>
+ 
+           {packageType === 'basic' ? (
+-            <div className="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-850 p-4 text-sm text-surface-700 dark:text-surface-300">
++            <div aria-labelledby="delivery-location-label" className="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-850 p-4 text-sm text-surface-700 dark:text-surface-300">
+               Basic orders are delivered at{' '}
+               <span className="font-semibold">{GENERAL_DELIVERY_LOCATION}</span>.
+             </div>
+           ) : (
+             <div className="space-y-3">
+               <Select
++                aria-labelledby="delivery-location-label"
+                 value={deliveryLocation}
+                 onChange={(e) => setDeliveryLocation(e.target.value)}
+                 options={[
+@@ -236,6 +286,7 @@ export function RegisterPackageModal({
+               />
+               {deliveryLocation === CUSTOM_LOCATION_VALUE && (
+                 <Input
++                  aria-label="Custom UNILAG delivery location"
+                   value={customLocation}
+                   onChange={(e) => setCustomLocation(e.target.value)}
+                   placeholder="e.g. Mariere Hall, Block C"
+@@ -246,24 +297,30 @@ export function RegisterPackageModal({
+         </div>
+ 
+         <div className="space-y-3">
+-          <div className="flex items-center gap-2 text-sm font-semibold text-surface-900 dark:text-surface-100">
+-            <Paperclip className="w-4 h-4 text-brand-500" />
+-            Course Outline
+-            <span className="text-error-500">*</span>
+-          </div>
++          <p id="lab-guidelines-label" className="flex items-center gap-2 text-sm font-semibold text-surface-900 dark:text-surface-100">
++            <Paperclip className="w-4 h-4 text-brand-500" aria-hidden="true" />
++            Lab Guidelines
++            <span className="text-error-500" aria-label="required">*</span>
++          </p>
+           <p className="text-xs text-surface-500 dark:text-surface-400">
+-            Attach your course outline (PDF or DOCX) so we can format your lab report correctly.
++            Attach your lab guidelines (PDF or DOCX) so we can format your lab report correctly.
+           </p>
+           <input
+             ref={fileInputRef}
+             type="file"
+             accept=".pdf,.doc,.docx"
++            aria-label="Lab guidelines file"
++            aria-labelledby="lab-guidelines-label"
+             className="hidden"
+             onChange={(e) => setOutlineFile(e.target.files?.[0] ?? null)}
+           />
+-          {outlineFile ? (
++          {uploadingOutline ? (
++            <div aria-live="polite" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-surface-200 dark:border-surface-700 text-sm text-surface-500">
++              Uploading…
++            </div>
++          ) : outlineFile ? (
+             <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/20">
+-              <Paperclip className="w-4 h-4 text-brand-500 shrink-0" />
++              <Paperclip className="w-4 h-4 text-brand-500 shrink-0" aria-hidden="true" />
+               <span className="text-sm text-surface-700 dark:text-surface-300 flex-1 truncate">
+                 {outlineFile.name}
+               </span>
+@@ -273,21 +330,46 @@ export function RegisterPackageModal({
+                 className="text-surface-400 hover:text-error-500 transition-colors cursor-pointer"
+                 aria-label="Remove file"
+               >
+-                <X className="w-4 h-4" />
++                <X className="w-4 h-4" aria-hidden="true" />
+               </button>
+             </div>
+           ) : (
+             <button
+               type="button"
+               onClick={() => fileInputRef.current?.click()}
++              aria-labelledby="lab-guidelines-label"
+               className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-700 text-sm text-surface-500 hover:border-brand-400 hover:text-brand-500 transition-colors cursor-pointer"
+             >
+-              <Paperclip className="w-4 h-4" />
+-              Attach course outline
++              <Paperclip className="w-4 h-4" aria-hidden="true" />
++              Attach lab guidelines
+             </button>
+           )}
+         </div>
+ 
++        <div className="space-y-3">
++          <p id="delivery-time-label" className="flex items-center gap-2 text-sm font-semibold text-surface-900 dark:text-surface-100">
++            <Clock className="w-4 h-4 text-brand-500" aria-hidden="true" />
++            Preferred Delivery Date &amp; Time
++            {packageType === 'pro' && <span className="text-error-500" aria-label="required">*</span>}
++          </p>
++          {packageType === 'basic' ? (
++            <p className="text-xs text-surface-500 dark:text-surface-400">
++              Select a preferred time. An admin will reach out to confirm the exact pickup time for Basic orders.
++            </p>
++          ) : (
++            <p className="text-xs text-surface-500 dark:text-surface-400">
++              Choose when you'd like your report delivered. Minimum 2 days from today.
++            </p>
++          )}
++          <DateTimePicker
++            aria-labelledby="delivery-time-label"
++            value={deliveryTime}
++            onChange={setDeliveryTime}
++            min={minDateTime}
++            placeholder="Pick a date & time"
++          />
++        </div>
++
+         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-5 border-t border-surface-200 dark:border-surface-800">
+           <Button variant="secondary" onClick={onClose} disabled={paying || isRegistering}>
+             Cancel
+@@ -302,5 +384,54 @@ export function RegisterPackageModal({
+         </div>
+       </div>
+     </Modal>
++
++    {/* Payment confirmation modal */}
++    <Modal
++      isOpen={confirmOpen}
++      onClose={() => setConfirmOpen(false)}
++      title="Confirm Payment"
++      size="sm"
++    >
++      <div className="space-y-5">
++        <p className="text-sm text-surface-600 dark:text-surface-400">
++          You are about to pay <span className="font-semibold text-surface-900 dark:text-surface-100">{formatNaira(selectedPackage.amountKobo)}</span> for the <span className="font-semibold text-surface-900 dark:text-surface-100">{selectedPackage.label}</span> package on <span className="font-semibold text-surface-900 dark:text-surface-100">{course.code}</span>.
++        </p>
++
++        <label className="flex items-start gap-3 cursor-pointer group">
++          <input
++            type="checkbox"
++            checked={termsAgreed}
++            onChange={(e) => setTermsAgreed(e.target.checked)}
++            className="mt-0.5 w-4 h-4 rounded border-surface-300 text-brand-500 focus:ring-brand-500 cursor-pointer"
++          />
++          <span className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
++            I have read and agree to the{' '}
++            <Link
++              to="/terms"
++              target="_blank"
++              rel="noopener noreferrer"
++              className="text-brand-600 dark:text-brand-400 hover:underline font-medium"
++              onClick={(e) => e.stopPropagation()}
++            >
++              Terms &amp; Conditions
++            </Link>
++          </span>
++        </label>
++
++        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
++          <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
++            Cancel
++          </Button>
++          <Button
++            onClick={handleConfirmPayment}
++            disabled={!termsAgreed}
++            icon={<CreditCard className="w-4 h-4" />}
++          >
++            Confirm &amp; Pay
++          </Button>
++        </div>
++      </div>
++    </Modal>
++    </>
+   );
+ }
+diff --git a/src/components/layout/Navbar.tsx b/src/components/layout/Navbar.tsx
+index eea48c9..775c786 100644
+--- a/src/components/layout/Navbar.tsx
++++ b/src/components/layout/Navbar.tsx
+@@ -12,6 +12,7 @@ import {
+ } from 'lucide-react';
+ import Logo from "../ui/Logo";
+ import { useState, useRef, useEffect } from 'react';
++import { createPortal } from 'react-dom';
+ import gsap from 'gsap';
+ import { useAuth } from '../../contexts/AuthContext';
+ import { useToast } from '../../contexts/ToastContext';
+@@ -51,26 +52,7 @@ export function Navbar() {
+       });
+     }
+ 
+-    // Logo hover animation
+-    if (logoRef.current) {
+-      logoRef.current.addEventListener('mouseenter', () => {
+-        gsap.to(logoRef.current, {
+-          rotate: 360,
+-          scale: 1.1,
+-          duration: 0.6,
+-          ease: 'power2.out',
+-        });
+-      });
+-
+-      logoRef.current.addEventListener('mouseleave', () => {
+-        gsap.to(logoRef.current, {
+-          rotate: 0,
+-          scale: 1,
+-          duration: 0.4,
+-          ease: 'power2.out',
+-        });
+-      });
+-    }
++    // Logo hover animation removed — Logo component handles its own CSS hover animation
+   }, []);
+ 
+   useEffect(() => {
+@@ -105,6 +87,7 @@ export function Navbar() {
+   const isActive = (path: string) => location.pathname === path;
+ 
+   return (
++    <>
+     <nav
+       ref={navRef}
+       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled
+@@ -192,6 +175,7 @@ export function Navbar() {
+               className="md:hidden p-2 rounded-xl text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer"
+               aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+               aria-expanded={mobileMenuOpen}
++              aria-controls="mobile-drawer"
+             >
+               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+             </button>
+@@ -283,96 +267,158 @@ export function Navbar() {
+             )}
+           </div>
+         </div>
++      </div>
+ 
+-        {mobileMenuOpen && (
+-          <div className="md:hidden mt-4 pb-4 border-t border-surface-200/60 dark:border-surface-800/60 pt-4 animate-slide-down">
+-            <div className="flex flex-col gap-1">
+-              <Link
+-                to="/courses"
+-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${isActive('/courses')
++      <style>{`
++        @keyframes dropdownSlide {
++          from { opacity: 0; transform: translateY(-8px) scale(0.95); }
++          to   { opacity: 1; transform: translateY(0) scale(1); }
++        }
++        @keyframes drawerIn {
++          from { transform: translateX(100%); }
++          to   { transform: translateX(0); }
++        }
++        @keyframes drawerOut {
++          from { transform: translateX(0); }
++          to   { transform: translateX(100%); }
++        }
++      `}</style>
++    </nav>
++
++    {/* Mobile drawer portal */}
++    {createPortal(
++      <>
++        {/* Backdrop */}
++        <div
++          onClick={() => setMobileMenuOpen(false)}
++          className={`md:hidden fixed inset-0 z-40 bg-surface-950/50 backdrop-blur-sm transition-opacity duration-300 ${
++            mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
++          }`}
++          aria-hidden="true"
++        />
++
++        {/* Drawer panel */}
++        <div
++          id="mobile-drawer"
++          role="dialog"
++          aria-modal="true"
++          aria-label="Navigation menu"
++          className={`md:hidden fixed top-0 right-0 bottom-0 z-50 w-72 bg-surface-0 dark:bg-surface-950 border-l border-surface-200/60 dark:border-surface-800/60 flex flex-col transition-transform duration-300 ease-out ${
++            mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
++          }`}
++        >
++          {/* Drawer header */}
++          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200/60 dark:border-surface-800/60">
++            <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">Menu</span>
++            <button
++              type="button"
++              onClick={() => setMobileMenuOpen(false)}
++              className="p-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer"
++              aria-label="Close menu"
++            >
++              <X className="w-5 h-5" />
++            </button>
++          </div>
++
++          {/* Nav links */}
++          <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
++            <Link
++              to="/courses"
++              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
++                isActive('/courses')
+                   ? 'bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-400'
+                   : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+-                  }`}
+-              >
+-                <BookOpen className="w-4 h-4" />
+-                Courses
+-              </Link>
++              }`}
++            >
++              <BookOpen className="w-4 h-4" />
++              Courses
++            </Link>
+ 
+-              {user && (
+-                <>
+-                  <Link
+-                    to="/dashboard"
+-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${isActive('/dashboard')
++            {user && (
++              <>
++                <Link
++                  to="/dashboard"
++                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
++                    isActive('/dashboard')
+                       ? 'bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-400'
+                       : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+-                      }`}
+-                  >
+-                    <LayoutDashboard className="w-4 h-4" />
+-                    Dashboard
+-                  </Link>
+-                  {profile?.role === 'admin' && (
+-                    <Link
+-                      to="/admin"
+-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${isActive('/admin')
++                  }`}
++                >
++                  <LayoutDashboard className="w-4 h-4" />
++                  Dashboard
++                </Link>
++
++                {profile?.role === 'admin' && (
++                  <Link
++                    to="/admin"
++                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
++                      isActive('/admin')
+                         ? 'bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-400'
+                         : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+-                        }`}
+-                    >
+-                      <Shield className="w-4 h-4" />
+-                      Admin
+-                    </Link>
+-                  )}
+-                  <Link
+-                    to="/settings"
+-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${isActive('/settings')
+-                      ? 'bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-400'
+-                      : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+-                      }`}
++                    }`}
+                   >
+-                    <Settings className="w-4 h-4" />
+-                    Settings
++                    <Shield className="w-4 h-4" />
++                    Admin
+                   </Link>
+-                  <button
+-                    onClick={handleSignOut}
+-                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-950/30"
+-                  >
+-                    <LogOut className="w-4 h-4" />
+-                    Sign out
+-                  </button>
+-                </>
+-              )}
++                )}
+ 
+-              {!user && (
+-                <div className="flex flex-col gap-2 pt-3 mt-2 border-t border-surface-200/60 dark:border-surface-800/60">
+-                  <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+-                    <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer">
+-                      Sign in
+-                    </button>
+-                  </Link>
+-                  <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
+-                    <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors cursor-pointer">
+-                      Get started
+-                    </button>
+-                  </Link>
++                <Link
++                  to="/settings"
++                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
++                    isActive('/settings')
++                      ? 'bg-brand-50 dark:bg-brand-950/30 text-brand-600 dark:text-brand-400'
++                      : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
++                  }`}
++                >
++                  <Settings className="w-4 h-4" />
++                  Settings
++                </Link>
++              </>
++            )}
++          </nav>
++
++          {/* Drawer footer */}
++          <div className="px-4 py-5 border-t border-surface-200/60 dark:border-surface-800/60 space-y-2">
++            {user ? (
++              <>
++                <div className="flex items-center gap-3 px-3 py-2 mb-1">
++                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0">
++                    <User className="w-4 h-4 text-white" />
++                  </div>
++                  <div className="min-w-0">
++                    <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{user.full_name}</p>
++                    <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{user.email}</p>
++                  </div>
+                 </div>
+-              )}
+-            </div>
++                <button
++                  onClick={handleSignOut}
++                  className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-950/30"
++                >
++                  <LogOut className="w-4 h-4" />
++                  Sign out
++                </button>
++              </>
++            ) : (
++              <>
++                <Link
++                  to="/login"
++                  className="flex items-center justify-center px-4 py-3 rounded-xl text-sm font-medium border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
++                >
++                  Sign in
++                </Link>
++                <Link
++                  to="/signup"
++                  className="flex items-center justify-center px-4 py-3 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors"
++                >
++                  Get started
++                </Link>
++              </>
++            )}
+           </div>
+-        )}
+-      </div>
+-
+-      <style>{`
+-        @keyframes dropdownSlide {
+-          from {
+-            opacity: 0;
+-            transform: translateY(-8px) scale(0.95);
+-          }
+-          to {
+-            opacity: 1;
+-            transform: translateY(0) scale(1);
+-          }
+-        }
+-      `}</style>
+-    </nav>
++        </div>
++      </>,
++      document.body
++    )}
++  </>
+   );
+ }
+diff --git a/src/components/ui/DateTimePicker.tsx b/src/components/ui/DateTimePicker.tsx
+new file mode 100644
+index 0000000..5391642
+--- /dev/null
++++ b/src/components/ui/DateTimePicker.tsx
+@@ -0,0 +1,191 @@
++import { useState, useRef, useEffect, useCallback } from 'react';
++import { createPortal } from 'react-dom';
++import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
++
++interface DateTimePickerProps {
++  value: string; // "YYYY-MM-DDTHH:mm"
++  onChange: (value: string) => void;
++  min?: string;
++  placeholder?: string;
++  'aria-labelledby'?: string;
++}
++
++const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
++  'July', 'August', 'September', 'October', 'November', 'December'];
++const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
++
++function pad(n: number) { return String(n).padStart(2, '0'); }
++
++function toLocal(date: Date) {
++  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
++}
++
++export function DateTimePicker({ value, onChange, min, placeholder = 'Select date & time', 'aria-labelledby': ariaLabelledBy }: DateTimePickerProps) {
++  const [open, setOpen] = useState(false);
++  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
++  const [viewDate, setViewDate] = useState(() => {
++    const base = value ? new Date(value) : new Date();
++    return new Date(base.getFullYear(), base.getMonth(), 1);
++  });
++  const [time, setTime] = useState(() => {
++    if (value) { const d = new Date(value); return { h: pad(d.getHours()), m: pad(d.getMinutes()) }; }
++    return { h: '12', m: '00' };
++  });
++
++  const triggerRef = useRef<HTMLButtonElement>(null);
++  const dropdownRef = useRef<HTMLDivElement>(null);
++  const minDate = min ? new Date(min) : null;
++  const selectedDate = value ? new Date(value) : null;
++
++  const updatePosition = useCallback(() => {
++    if (!triggerRef.current) return;
++    const rect = triggerRef.current.getBoundingClientRect();
++    const dropH = 360; // approximate dropdown height
++    const spaceBelow = window.innerHeight - rect.bottom;
++    const top = spaceBelow > dropH ? rect.bottom + 6 : rect.top - dropH - 6;
++    setDropdownPos({ top: top + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
++  }, []);
++
++  const openPicker = () => {
++    updatePosition();
++    setOpen(true);
++  };
++
++  // Close on outside click
++  useEffect(() => {
++    if (!open) return;
++    const handler = (e: MouseEvent) => {
++      const target = e.target as Node;
++      if (triggerRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
++      setOpen(false);
++    };
++    document.addEventListener('mousedown', handler);
++    window.addEventListener('scroll', updatePosition, true);
++    window.addEventListener('resize', updatePosition);
++    return () => {
++      document.removeEventListener('mousedown', handler);
++      window.removeEventListener('scroll', updatePosition, true);
++      window.removeEventListener('resize', updatePosition);
++    };
++  }, [open, updatePosition]);
++
++  const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
++  const firstDayOfWeek = viewDate.getDay();
++
++  const selectDay = (day: number) => {
++    const d = new Date(viewDate.getFullYear(), viewDate.getMonth(), day, parseInt(time.h), parseInt(time.m));
++    onChange(toLocal(d));
++  };
++
++  const updateTime = (field: 'h' | 'm', raw: string) => {
++    const max = field === 'h' ? 23 : 59;
++    const num = Math.min(max, Math.max(0, parseInt(raw) || 0));
++    const next = { ...time, [field]: pad(num) };
++    setTime(next);
++    if (selectedDate) {
++      const d = new Date(selectedDate);
++      d.setHours(parseInt(next.h), parseInt(next.m));
++      onChange(toLocal(d));
++    }
++  };
++
++  const isDayDisabled = (day: number) => {
++    if (!minDate) return false;
++    return new Date(viewDate.getFullYear(), viewDate.getMonth(), day, 23, 59) < minDate;
++  };
++
++  const isDaySelected = (day: number) =>
++    !!selectedDate &&
++    selectedDate.getFullYear() === viewDate.getFullYear() &&
++    selectedDate.getMonth() === viewDate.getMonth() &&
++    selectedDate.getDate() === day;
++
++  const displayValue = selectedDate
++    ? selectedDate.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })
++    : '';
++
++  const dropdown = open ? createPortal(
++    <div
++      ref={dropdownRef}
++      style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, width: Math.max(dropdownPos.width, 288), zIndex: 9999 }}
++      className="rounded-2xl bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-xl p-4"
++    >
++      {/* Month navigation */}
++      <div className="flex items-center justify-between mb-3">
++        <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
++          className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer">
++          <ChevronLeft className="w-4 h-4 text-surface-600 dark:text-surface-400" />
++        </button>
++        <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">
++          {MONTHS[viewDate.getMonth()]} {viewDate.getFullYear()}
++        </span>
++        <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
++          className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer">
++          <ChevronRight className="w-4 h-4 text-surface-600 dark:text-surface-400" />
++        </button>
++      </div>
++
++      {/* Day headers */}
++      <div className="grid grid-cols-7 mb-1">
++        {DAYS.map(d => <div key={d} className="text-center text-[10px] font-semibold text-surface-400 dark:text-surface-500 py-1">{d}</div>)}
++      </div>
++
++      {/* Day grid */}
++      <div className="grid grid-cols-7 gap-y-1">
++        {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`e${i}`} />)}
++        {Array.from({ length: daysInMonth }).map((_, i) => {
++          const day = i + 1;
++          const disabled = isDayDisabled(day);
++          const selected = isDaySelected(day);
++          return (
++            <button key={day} type="button" disabled={disabled} onClick={() => selectDay(day)}
++              className={`h-8 w-full rounded-lg text-xs font-medium transition-colors
++                ${selected ? 'bg-brand-500 text-white' : ''}
++                ${!selected && !disabled ? 'hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-900 dark:text-surface-100 cursor-pointer' : ''}
++                ${disabled ? 'text-surface-300 dark:text-surface-700 cursor-not-allowed' : ''}
++              `}
++            >{day}</button>
++          );
++        })}
++      </div>
++
++      {/* Time row */}
++      <div className="mt-3 pt-3 border-t border-surface-200 dark:border-surface-800 flex items-center justify-center gap-2">
++        <Clock className="w-4 h-4 text-surface-400" />
++        <input type="number" min={0} max={23} value={time.h}
++          onChange={e => updateTime('h', e.target.value)} onBlur={e => updateTime('h', e.target.value)}
++          className="w-12 h-8 text-center rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-100 text-sm font-semibold border-none focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
++        <span className="text-surface-600 dark:text-surface-400 font-bold">:</span>
++        <input type="number" min={0} max={59} value={time.m}
++          onChange={e => updateTime('m', e.target.value)} onBlur={e => updateTime('m', e.target.value)}
++          className="w-12 h-8 text-center rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-100 text-sm font-semibold border-none focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
++        <button type="button" onClick={() => setOpen(false)}
++          className="ml-2 px-3 h-8 rounded-lg bg-brand-500 text-white text-xs font-semibold hover:bg-brand-600 transition-colors cursor-pointer">
++          Done
++        </button>
++      </div>
++    </div>,
++    document.body
++  ) : null;
++
++  return (
++    <div className="relative">
++      <button
++        ref={triggerRef}
++        type="button"
++        onClick={openPicker}
++        aria-labelledby={ariaLabelledBy}
++        aria-haspopup="dialog"
++        aria-expanded={open}
++        className={`w-full h-11 px-3.5 rounded-xl bg-surface-0 dark:bg-surface-900 border text-left flex items-center justify-between transition-colors cursor-pointer
++          ${open ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-surface-200 dark:border-surface-800 hover:border-surface-300 dark:hover:border-surface-700'}`}
++      >
++        <span className={`text-sm ${displayValue ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400'}`}>
++          {displayValue || placeholder}
++        </span>
++        <Clock className="w-4 h-4 text-surface-400 shrink-0" />
++      </button>
++      {dropdown}
++    </div>
++  );
++}
+diff --git a/src/components/ui/Logo.tsx b/src/components/ui/Logo.tsx
+index f9b0da8..59faf0f 100644
+--- a/src/components/ui/Logo.tsx
++++ b/src/components/ui/Logo.tsx
+@@ -1,11 +1,83 @@
+-import logo from '../../assets/logo.png';
++/**
++ * Quantara Logo
++ * Story: A stylised atom — the nucleus represents a single source of knowledge,
++ * the orbiting ring represents the AI pipeline that processes and returns it.
++ * The gap in the ring echoes the letter Q (Quantara).
++ */
++const Logo = ({ size = 40 }: { size?: number }) => (
++  <svg
++    width={size}
++    height={size}
++    viewBox="0 0 40 40"
++    fill="none"
++    xmlns="http://www.w3.org/2000/svg"
++    aria-label="Quantara logo"
++    role="img"
++    className="quantara-logo"
++    style={{ flexShrink: 0 }}
++  >
++    <style>{`
++      .quantara-logo .ring {
++        transform-origin: 20px 20px;
++        transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
++      }
++      .quantara-logo:hover .ring {
++        transform: rotate(180deg);
++      }
++      .quantara-logo .nucleus {
++        transition: r 0.3s ease, opacity 0.3s ease;
++      }
++      .quantara-logo:hover .nucleus {
++        r: 4;
++      }
++    `}</style>
+ 
+-const Logo = () => {
+-    return (
+-        <div className="h-10 w-10 rounded-[25%] overflow-hidden">
+-            <img src={logo} alt="Quantara Logo" className="h-full w-full" />
+-        </div>
+-    )
+-}
++    {/* Background pill */}
++    <rect width="40" height="40" rx="10" fill="url(#logo-bg)" />
+ 
+-export default Logo;
+\ No newline at end of file
++    {/* Orbit ring with Q-gap */}
++    <circle
++      className="ring"
++      cx="20"
++      cy="20"
++      r="11"
++      stroke="url(#logo-ring)"
++      strokeWidth="2.5"
++      strokeLinecap="round"
++      strokeDasharray="56 14"
++      strokeDashoffset="0"
++      fill="none"
++    />
++
++    {/* Nucleus */}
++    <circle className="nucleus" cx="20" cy="20" r="3" fill="url(#logo-nucleus)" />
++
++    {/* Tail of the Q — the "exit vector" */}
++    <line
++      x1="28"
++      y1="28"
++      x2="32"
++      y2="32"
++      stroke="url(#logo-ring)"
++      strokeWidth="2.5"
++      strokeLinecap="round"
++    />
++
++    <defs>
++      <linearGradient id="logo-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
++        <stop offset="0%" stopColor="#4f46e5" />
++        <stop offset="100%" stopColor="#6366f1" />
++      </linearGradient>
++      <linearGradient id="logo-ring" x1="9" y1="9" x2="31" y2="31" gradientUnits="userSpaceOnUse">
++        <stop offset="0%" stopColor="#c7d2fe" />
++        <stop offset="100%" stopColor="#e0e7ff" />
++      </linearGradient>
++      <radialGradient id="logo-nucleus" cx="50%" cy="50%" r="50%">
++        <stop offset="0%" stopColor="#ffffff" />
++        <stop offset="100%" stopColor="#c7d2fe" />
++      </radialGradient>
++    </defs>
++  </svg>
++);
++
++export default Logo;
+diff --git a/src/components/ui/Modal.tsx b/src/components/ui/Modal.tsx
+index 3bec86a..6d94366 100644
+--- a/src/components/ui/Modal.tsx
++++ b/src/components/ui/Modal.tsx
+@@ -116,12 +116,12 @@ export function Modal({
+             bg-surface-0 dark:bg-surface-900
+             rounded-2xl shadow-xl shadow-surface-950/10 dark:shadow-surface-950/40
+             border border-surface-200/80 dark:border-surface-800/80
+-            overflow-hidden
++            flex flex-col max-h-[90vh]
+           `}
+           onClick={(e) => e.stopPropagation()}
+         >
+           {(title || description) && (
+-            <div className="flex items-start justify-between p-6 pb-0">
++            <div className="flex items-start justify-between p-6 pb-0 shrink-0">
+               <div>
+                 {title && (
+                   <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100">
+@@ -144,7 +144,7 @@ export function Modal({
+               )}
+             </div>
+           )}
+-          <div className="p-6">{children}</div>
++          <div className="p-6 overflow-y-auto">{children}</div>
+         </div>
+       </div>
+     </Fragment>
+diff --git a/src/components/ui/index.ts b/src/components/ui/index.ts
+index 9bf1776..ecb9556 100644
+--- a/src/components/ui/index.ts
++++ b/src/components/ui/index.ts
+@@ -7,3 +7,4 @@ export { Badge } from './Badge';
+ export { EmptyState } from './EmptyState';
+ export { Select } from './Select';
+ export { Toggle } from './Toggle';
++export { DateTimePicker } from './DateTimePicker';
+diff --git a/src/hooks/useAdmin.ts b/src/hooks/useAdmin.ts
+index c74180b..dbe85d6 100644
+--- a/src/hooks/useAdmin.ts
++++ b/src/hooks/useAdmin.ts
+@@ -43,24 +43,46 @@ async function getAllStudents(): Promise<Profile[]> {
+ }
+ 
+ async function getAllRegistrations() {
+-  const { data, error } = await supabase
++  const fullSelect = `
++    id,
++    created_at,
++    package_type,
++    delivery_location,
++    delivery_time,
++    payment_reference,
++    payment_status,
++    amount_kobo,
++    outline_url,
++    user:profiles (id, full_name, email, phone, department),
++    course:courses (id, code, title)
++  `;
++
++  let { data, error } = await supabase
+     .from('registrations')
+-    .select(
+-      `
+-      id,
+-      created_at,
+-      package_type,
+-      delivery_location,
+-      payment_reference,
+-      payment_status,
+-      amount_kobo,
+-      outline_url,
+-      user:profiles (id, full_name, email, phone, department),
+-      course:courses (id, code, title)
+-    `
+-    )
++    .select(fullSelect)
+     .order('created_at', { ascending: false });
+ 
++  // Fall back to base columns if new columns don't exist on remote yet (migrations pending)
++  if (error) {
++    const fallback = await supabase
++      .from('registrations')
++      .select(`
++        id,
++        created_at,
++        package_type,
++        delivery_location,
++        payment_reference,
++        payment_status,
++        amount_kobo,
++        user:profiles (id, full_name, email, phone, department),
++        course:courses (id, code, title)
++      `)
++      .order('created_at', { ascending: false });
++    if (fallback.error) throw fallback.error;
++    data = fallback.data;
++    error = null;
++  }
++
+   if (error) throw error;
+ 
+   return (data as unknown) as (Registration & {
+diff --git a/src/hooks/useCourses.ts b/src/hooks/useCourses.ts
+index f3b2311..88c6ca1 100644
+--- a/src/hooks/useCourses.ts
++++ b/src/hooks/useCourses.ts
+@@ -90,7 +90,8 @@ async function registerForCourse(
+   paymentReference: string | null = null,
+   paymentStatus: 'pending' | 'paid' | 'failed' = 'paid',
+   amountKobo: number = 0,
+-  outlineUrl: string | null = null
++  outlineUrl: string | null = null,
++  deliveryTime: string | null = null
+ ) {
+   if (paymentReference) {
+     const { data: existingPaymentRegistration, error: existingPaymentError } = await supabase
+@@ -137,6 +138,7 @@ async function registerForCourse(
+       course_id: courseId,
+       package_type: packageType,
+       delivery_location: deliveryLocation,
++      delivery_time: deliveryTime,
+       payment_reference: paymentReference,
+       payment_status: paymentStatus,
+       amount_kobo: amountKobo,
+@@ -252,6 +254,7 @@ export function useRegisterForCourse() {
+       paymentStatus,
+       amountKobo,
+       outlineUrl,
++      deliveryTime,
+     }: {
+       userId: string;
+       courseId: string;
+@@ -261,6 +264,7 @@ export function useRegisterForCourse() {
+       paymentStatus?: 'pending' | 'paid' | 'failed';
+       amountKobo?: number;
+       outlineUrl?: string | null;
++      deliveryTime?: string | null;
+     }) =>
+       registerForCourse(
+         userId,
+@@ -270,7 +274,8 @@ export function useRegisterForCourse() {
+         paymentReference,
+         paymentStatus,
+         amountKobo,
+-        outlineUrl ?? null
++        outlineUrl ?? null,
++        deliveryTime ?? null
+       ),
+   });
+ }
+diff --git a/src/lib/paystack.ts b/src/lib/paystack.ts
+index a984ed5..e158d6e 100644
+--- a/src/lib/paystack.ts
++++ b/src/lib/paystack.ts
+@@ -8,6 +8,7 @@ export type PendingRegistration = {
+   courseId: string;
+   packageType: RegistrationPackage;
+   deliveryLocation: string;
++  deliveryTime?: string | null;
+   amountKobo: number;
+   returnPath: string;
+   outlineUrl?: string | null;
+@@ -65,6 +66,7 @@ export async function initializePaystackCheckout({
+   courseId,
+   userId,
+   deliveryLocation,
++  deliveryTime,
+   outlineUrl,
+   callbackUrl,
+ }: {
+@@ -73,6 +75,7 @@ export async function initializePaystackCheckout({
+   courseId: string;
+   userId: string;
+   deliveryLocation: string;
++  deliveryTime?: string | null;
+   outlineUrl?: string | null;
+   callbackUrl?: string;
+ }) {
+@@ -85,6 +88,7 @@ export async function initializePaystackCheckout({
+       courseId,
+       userId,
+       deliveryLocation,
++      deliveryTime: deliveryTime ?? null,
+       outlineUrl: outlineUrl ?? null,
+       callbackUrl: callbackUrl || `${window.location.origin}/payment/callback`,
+     }),
+diff --git a/src/pages/AdminDashboard.tsx b/src/pages/AdminDashboard.tsx
+index bef73ee..7d0f8e6 100644
+--- a/src/pages/AdminDashboard.tsx
++++ b/src/pages/AdminDashboard.tsx
+@@ -337,7 +337,7 @@ export function AdminDashboard() {
+                   <th className="pb-3 px-4">Package</th>
+                   <th className="pb-3 px-4">Delivery</th>
+                   <th className="pb-3 px-4">Payment</th>
+-                  <th className="pb-3 px-4">Outline</th>
++                  <th className="pb-3 px-4">Lab Guidelines</th>
+                   <th className="pb-3 pl-4 text-right">Date</th>
+                 </tr>
+               </thead>
+@@ -366,10 +366,18 @@ export function AdminDashboard() {
+                       </Badge>
+                     </td>
+                     <td
+-                      className="py-3 px-4 text-xs text-surface-600 dark:text-surface-400 max-w-[180px] truncate"
++                      className="py-3 px-4 text-xs text-surface-600 dark:text-surface-400 max-w-[180px]"
+                       title={registration.delivery_location}
+                     >
+-                      {registration.delivery_location}
++                      <p className="truncate">{registration.delivery_location}</p>
++                      {registration.delivery_time && (
++                        <p className="text-[10px] text-brand-600 dark:text-brand-400 mt-0.5">
++                          {new Date(registration.delivery_time).toLocaleString('en-NG', {
++                            dateStyle: 'medium',
++                            timeStyle: 'short',
++                          })}
++                        </p>
++                      )}
+                     </td>
+                     <td className="py-3 px-4">
+                       <p className="font-semibold text-xs">
+@@ -387,16 +395,40 @@ export function AdminDashboard() {
+                     </td>
+                     <td className="py-3 px-4">
+                       {registration.outline_url ? (
+-                        <a
+-                          href={registration.outline_url}
+-                          target="_blank"
+-                          rel="noopener noreferrer"
+-                          className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+-                          title="View course outline"
+-                        >
+-                          <Paperclip className="w-3 h-3" />
+-                          View
+-                        </a>
++                        <div className="flex flex-col items-start gap-1.5">
++                          <a
++                            href={registration.outline_url}
++                            target="_blank"
++                            rel="noopener noreferrer"
++                            className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
++                            title="View lab guidelines"
++                          >
++                            <Paperclip className="w-3 h-3" />
++                            View
++                          </a>
++                          <button
++                            type="button"
++                            title="Download lab guidelines"
++                            className="text-xs text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 cursor-pointer"
++                            onClick={async () => {
++                              try {
++                                const res = await fetch(registration.outline_url!);
++                                const blob = await res.blob();
++                                const url = URL.createObjectURL(blob);
++                                const a = document.createElement('a');
++                                a.href = url;
++                                const ext = registration.outline_url!.split('.').pop()?.split('?')[0] ?? 'pdf';
++                                a.download = `outline-${registration.id}.${ext}`;
++                                a.click();
++                                URL.revokeObjectURL(url);
++                              } catch {
++                                window.open(registration.outline_url!, '_blank');
++                              }
++                            }}
++                          >
++                            ↓ Download
++                          </button>
++                        </div>
+                       ) : (
+                         <span className="text-xs text-surface-400 dark:text-surface-600">—</span>
+                       )}
+diff --git a/src/pages/PaymentCallbackPage.tsx b/src/pages/PaymentCallbackPage.tsx
+index 0f134c2..665084d 100644
+--- a/src/pages/PaymentCallbackPage.tsx
++++ b/src/pages/PaymentCallbackPage.tsx
+@@ -58,6 +58,14 @@ export function PaymentCallbackPage() {
+           pending?.deliveryLocation ||
+           (metadata.deliveryLocation as string | undefined) ||
+           (metadata.delivery_location as string | undefined);
++        const outlineUrl =
++          pending?.outlineUrl ||
++          (metadata.outlineUrl as string | undefined) ||
++          null;
++        const deliveryTime =
++          pending?.deliveryTime ||
++          (metadata.deliveryTime as string | undefined) ||
++          null;
+         const amountKobo = pending?.amountKobo ?? verification.amountKobo ?? verification.amount ?? 0;
+         const returnPath = pending?.returnPath || '/dashboard';
+         const paymentReference = verification.reference || reference!;
+@@ -92,6 +100,8 @@ export function PaymentCallbackPage() {
+               paymentReference,
+               paymentStatus: 'paid',
+               amountKobo,
++              outlineUrl: outlineUrl ?? null,
++              deliveryTime: deliveryTime ?? null,
+             });
+           } catch (registrationError) {
+             const message = (registrationError as Error).message.toLowerCase();
+diff --git a/src/pages/StudentDashboard.tsx b/src/pages/StudentDashboard.tsx
+index 95fedf4..0cc3eca 100644
+--- a/src/pages/StudentDashboard.tsx
++++ b/src/pages/StudentDashboard.tsx
+@@ -1,11 +1,12 @@
+-import { useState } from 'react';
++import { useEffect, useRef, useState } from 'react';
+ import { Navigate } from 'react-router-dom';
+-import { Calendar, Clock, Paperclip, TrendingUp, AlertCircle } from 'lucide-react';
++import { Calendar, Clock, Paperclip, TrendingUp, AlertCircle, BookOpen, Sparkles } from 'lucide-react';
++import gsap from 'gsap';
+ import { useAuth } from '../contexts/AuthContext';
+ import { useCoursesForUser, useMyRegistrations, useRegisterForCourse, useUnregisterFromCourse } from '../hooks';
+ import { useToast } from '../contexts/ToastContext';
+ import { DashboardLayout } from '../components/layout';
+-import { Card, Badge, Button, CourseCardSkeleton, ConfirmModal } from '../components/ui';
++import { Badge, Button, CourseCardSkeleton, ConfirmModal } from '../components/ui';
+ import { CourseCard } from '../components/CourseCard';
+ import Logo from '../components/ui/Logo';
+ import { RegisterPackageModal } from '../components/RegisterPackageModal';
+@@ -20,26 +21,36 @@ export function StudentDashboard() {
+   const [selectedCourseForReg, setSelectedCourseForReg] = useState<Course | null>(null);
+   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
+ 
++  const heroRef = useRef<HTMLDivElement>(null);
++  const statsRef = useRef<HTMLDivElement>(null);
++  const contentRef = useRef<HTMLDivElement>(null);
++
+   const { data: courses, isLoading: coursesLoading } = useCoursesForUser(user?.id);
+   const { data: registrations, isLoading: registrationsLoading } = useMyRegistrations(user?.id);
+   const registerMutation = useRegisterForCourse();
+   const unregisterMutation = useUnregisterFromCourse();
+ 
+-  if (!user) {
+-    return <Navigate to="/login" replace />;
+-  }
++  useEffect(() => {
++    const ctx = gsap.context(() => {
++      gsap.from(heroRef.current, { y: 20, opacity: 0, duration: 0.6, ease: 'power3.out' });
++      gsap.from(statsRef.current?.children ?? [], { y: 16, opacity: 0, duration: 0.5, ease: 'power3.out', stagger: 0.08, delay: 0.2 });
++      gsap.from(contentRef.current?.children ?? [], { y: 20, opacity: 0, duration: 0.5, ease: 'power3.out', stagger: 0.1, delay: 0.4 });
++    });
++    return () => ctx.revert();
++  }, []);
++
++  if (!user) return <Navigate to="/login" replace />;
+ 
+-  const registeredCourses =
+-    registrations?.map((r) => ({
+-      ...r.course,
+-      registrationId: r.id,
+-      packageType: r.package_type,
+-      deliveryLocation: r.delivery_location,
+-      amountKobo: r.amount_kobo,
+-      paymentStatus: r.payment_status,
+-      registeredAt: r.created_at,
+-      outlineUrl: r.outline_url,
+-    })) || [];
++  const registeredCourses = registrations?.map((r) => ({
++    ...r.course,
++    registrationId: r.id,
++    packageType: r.package_type,
++    deliveryLocation: r.delivery_location,
++    amountKobo: r.amount_kobo,
++    paymentStatus: r.payment_status,
++    registeredAt: r.created_at,
++    outlineUrl: r.outline_url,
++  })) || [];
+ 
+   const availableCourses = courses?.filter((c) => !c.is_registered) || [];
+ 
+@@ -57,7 +68,6 @@ export function StudentDashboard() {
+     amountKobo: number;
+   }) => {
+     if (!selectedCourseForReg || !user) return;
+-
+     try {
+       await registerMutation.mutateAsync({
+         userId: user.id,
+@@ -77,10 +87,8 @@ export function StudentDashboard() {
+ 
+   const handleUnregister = async () => {
+     if (!selectedCourse) return;
+-
+     const registration = registrations?.find((r) => r.course.id === selectedCourse);
+     if (!registration) return;
+-
+     try {
+       await unregisterMutation.mutateAsync(registration.id);
+       toast.success('Successfully unregistered');
+@@ -91,196 +99,197 @@ export function StudentDashboard() {
+     }
+   };
+ 
+-  const openUnregisterModal = (courseId: string) => {
+-    setSelectedCourse(courseId);
+-    setShowUnregisterModal(true);
+-  };
++  const stats = [
++    {
++      label: 'My Registrations',
++      value: registeredCourses.length,
++      icon: Calendar,
++      color: 'brand',
++    },
++    {
++      label: 'Open Slots',
++      value: availableCourses.filter((c) => c.registration_open && c.remaining_slots > 0).length,
++      icon: TrendingUp,
++      color: 'success',
++    },
++    {
++      label: 'Total Courses',
++      value: courses?.length || 0,
++      icon: BookOpen,
++      color: 'surface',
++    },
++  ];
+ 
+   return (
+     <DashboardLayout>
+-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+-        <div className="mb-8">
+-          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-            Welcome back, {user.full_name.split(' ')[0]}!
+-          </h1>
+-          <p className="text-surface-500 dark:text-surface-400 mt-1">
+-            Manage your slot registrations and browse open courses.
+-          </p>
+-        </div>
++      <div className="min-h-screen bg-surface-950 relative">
++        {/* Ambient glow */}
++        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(99,102,241,0.08)_0%,transparent_70%)]" />
+ 
+-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+-          <Card hover padding="md">
+-            <div className="flex items-center justify-between">
+-              <div>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">Slot registrations</p>
+-                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-                  {registeredCourses.length}
+-                </p>
+-              </div>
+-              <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-950/50 flex items-center justify-center">
+-                <Calendar className="w-6 h-6 text-brand-600 dark:text-brand-400" />
+-              </div>
+-            </div>
+-          </Card>
++        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+ 
+-          <Card hover padding="md">
+-            <div className="flex items-center justify-between">
+-              <div>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">Open slots</p>
+-                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-                  {availableCourses.filter((c) => c.registration_open && c.remaining_slots > 0).length}
+-                </p>
++          {/* Hero greeting */}
++          <div ref={heroRef} className="mb-8">
++            <div className="flex items-center gap-3 mb-3">
++              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-glow">
++                <Sparkles className="w-5 h-5 text-white" aria-hidden="true" />
+               </div>
+-              <div className="w-12 h-12 rounded-xl bg-success-100 dark:bg-success-950/50 flex items-center justify-center">
+-                <TrendingUp className="w-6 h-6 text-success-600 dark:text-success-400" />
+-              </div>
+-            </div>
+-          </Card>
+-
+-          <Card hover padding="md">
+-            <div className="flex items-center justify-between">
+               <div>
+-                <p className="text-sm text-surface-500 dark:text-surface-400">Total Courses</p>
+-                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+-                  {courses?.length || 0}
++                <h1 className="text-2xl font-bold text-surface-50 tracking-tight">
++                  Welcome back, {user.full_name.split(' ')[0]}
++                </h1>
++                <p className="text-sm text-surface-500 mt-0.5">
++                  Manage your registrations and browse open courses.
+                 </p>
+               </div>
+-              <div className="w-12 h-12 rounded-xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+-                <Logo />
+-              </div>
+             </div>
+-          </Card>
+-        </div>
+-
+-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+-          <div className="lg:col-span-2">
+-            <Card padding="none">
+-              <div className="p-6 border-b border-surface-200 dark:border-surface-800">
+-                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+-                  Available Courses
+-                </h2>
+-                <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
+-                  Browse open courses and register for service slots
+-                </p>
+-              </div>
++          </div>
+ 
+-              <div className="p-6">
+-                {coursesLoading ? (
+-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-                    <CourseCardSkeleton />
+-                    <CourseCardSkeleton />
++          {/* Stats */}
++          <div ref={statsRef} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
++            {stats.map(({ label, value, icon: Icon, color }) => (
++              <div
++                key={label}
++                className="relative overflow-hidden rounded-2xl bg-surface-900/60 border border-surface-800/60 backdrop-blur-sm p-5 group hover:border-surface-700/80 transition-colors duration-200"
++              >
++                <div className="flex items-center justify-between">
++                  <div>
++                    <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-1">{label}</p>
++                    <p className="text-3xl font-bold text-surface-50">{value}</p>
+                   </div>
+-                ) : availableCourses.length === 0 ? (
+-                  <div className="text-center py-12">
+-                    <AlertCircle className="w-12 h-12 text-surface-300 dark:text-surface-700 mx-auto mb-4" />
+-                    <p className="text-surface-500 dark:text-surface-400">
+-                      You're registered for all available courses.
+-                    </p>
++                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
++                    color === 'brand' ? 'bg-brand-500/10 text-brand-400' :
++                    color === 'success' ? 'bg-success-500/10 text-success-400' :
++                    'bg-surface-800 text-surface-400'
++                  }`}>
++                    <Icon className="w-5 h-5" aria-hidden="true" />
+                   </div>
+-                ) : (
+-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-                    {availableCourses.map((course) => (
+-                      <CourseCard
+-                        key={course.id}
+-                        course={course}
+-                        onRegister={handleRegisterClick}
+-                        isRegistering={registerMutation.isPending}
+-                      />
+-                    ))}
+-                  </div>
+-                )}
++                </div>
++                <div className={`absolute inset-x-0 bottom-0 h-px ${
++                  color === 'brand' ? 'bg-gradient-to-r from-transparent via-brand-500/40 to-transparent' :
++                  color === 'success' ? 'bg-gradient-to-r from-transparent via-success-500/40 to-transparent' :
++                  'bg-gradient-to-r from-transparent via-surface-700/40 to-transparent'
++                }`} />
+               </div>
+-            </Card>
++            ))}
+           </div>
+ 
+-          <div>
+-            <Card padding="none">
+-              <div className="p-6 border-b border-surface-200 dark:border-surface-800">
+-                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+-                  My Registrations
+-                </h2>
+-                <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
+-                  Your active slot registrations
+-                </p>
++          {/* Main content */}
++          <div ref={contentRef} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
++
++            {/* Available Courses */}
++            <div className="lg:col-span-2">
++              <div className="rounded-2xl bg-surface-900/60 border border-surface-800/60 backdrop-blur-sm overflow-hidden">
++                <div className="px-6 py-5 border-b border-surface-800/60">
++                  <h2 className="text-base font-semibold text-surface-100">Available Courses</h2>
++                  <p className="text-xs text-surface-500 mt-1">Browse open courses and register for service slots</p>
++                </div>
++                <div className="p-6">
++                  {coursesLoading ? (
++                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++                      <CourseCardSkeleton />
++                      <CourseCardSkeleton />
++                    </div>
++                  ) : availableCourses.length === 0 ? (
++                    <div className="text-center py-14">
++                      <div className="w-12 h-12 rounded-2xl bg-surface-800/60 flex items-center justify-center mx-auto mb-4">
++                        <AlertCircle className="w-6 h-6 text-surface-600" aria-hidden="true" />
++                      </div>
++                      <p className="text-sm text-surface-500">You're registered for all available courses.</p>
++                    </div>
++                  ) : (
++                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++                      {availableCourses.map((course) => (
++                        <CourseCard
++                          key={course.id}
++                          course={course}
++                          onRegister={handleRegisterClick}
++                          isRegistering={registerMutation.isPending}
++                        />
++                      ))}
++                    </div>
++                  )}
++                </div>
+               </div>
++            </div>
+ 
+-              <div className="p-6">
+-                {registrationsLoading ? (
+-                  <div className="space-y-3">
+-                    <div className="h-16 bg-surface-100 dark:bg-surface-800 rounded-lg animate-pulse" />
+-                    <div className="h-16 bg-surface-100 dark:bg-surface-800 rounded-lg animate-pulse" />
+-                  </div>
+-                ) : registeredCourses.length === 0 ? (
+-                  <div className="text-center py-8">
+-                    <Clock className="w-10 h-10 text-surface-300 dark:text-surface-700 mx-auto mb-3" />
+-                    <p className="text-sm text-surface-500 dark:text-surface-400">
+-                      No registrations yet. Browse available courses to get started.
+-                    </p>
+-                  </div>
+-                ) : (
+-                  <div className="space-y-3">
+-                    {registeredCourses.map((course) => (
+-                      <div
+-                        key={course.id}
+-                        className="p-4 rounded-xl bg-surface-50 dark:bg-surface-850 border border-surface-200 dark:border-surface-800 hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
+-                      >
+-                        <div className="flex items-start justify-between mb-2">
+-                          <Badge variant="info" size="sm">
+-                            {course.code}
+-                          </Badge>
+-                          <Button
+-                            variant="ghost"
+-                            size="sm"
+-                            onClick={() => openUnregisterModal(course.id)}
+-                            className="text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-950/50 -mr-1"
+-                          >
+-                            <span className="text-xs">Unregister</span>
+-                          </Button>
+-                        </div>
+-                        <h4 className="text-sm font-medium text-surface-900 dark:text-surface-100 line-clamp-1">
+-                          {course.title}
+-                        </h4>
+-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-surface-600 dark:text-surface-400">
+-                          <span className="capitalize">{course.packageType} package</span>
+-                          <span>{formatNaira(course.amountKobo)}</span>
+-                          <span className="capitalize">{course.paymentStatus}</span>
+-                        </div>
+-                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 line-clamp-1">
+-                          Delivery: {course.deliveryLocation}
+-                        </p>
+-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+-                          Registered {new Date(course.registeredAt).toLocaleDateString()}
+-                        </p>
+-                        {course.outlineUrl && (
+-                          <a
+-                            href={course.outlineUrl}
+-                            target="_blank"
+-                            rel="noopener noreferrer"
+-                            className="inline-flex items-center gap-1 mt-2 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+-                          >
+-                            <Paperclip className="w-3 h-3" />
+-                            View outline
+-                          </a>
+-                        )}
++            {/* My Registrations */}
++            <div>
++              <div className="rounded-2xl bg-surface-900/60 border border-surface-800/60 backdrop-blur-sm overflow-hidden">
++                <div className="px-6 py-5 border-b border-surface-800/60">
++                  <h2 className="text-base font-semibold text-surface-100">My Registrations</h2>
++                  <p className="text-xs text-surface-500 mt-1">Your active slot registrations</p>
++                </div>
++                <div className="p-4">
++                  {registrationsLoading ? (
++                    <div className="space-y-3">
++                      <div className="h-20 bg-surface-800/40 rounded-xl animate-pulse" />
++                      <div className="h-20 bg-surface-800/40 rounded-xl animate-pulse" />
++                    </div>
++                  ) : registeredCourses.length === 0 ? (
++                    <div className="text-center py-10">
++                      <div className="w-10 h-10 rounded-xl bg-surface-800/60 flex items-center justify-center mx-auto mb-3">
++                        <Clock className="w-5 h-5 text-surface-600" aria-hidden="true" />
+                       </div>
+-                    ))}
+-                  </div>
+-                )}
++                      <p className="text-xs text-surface-500">No registrations yet. Browse available courses to get started.</p>
++                    </div>
++                  ) : (
++                    <div className="space-y-2">
++                      {registeredCourses.map((course) => (
++                        <div
++                          key={course.id}
++                          className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/40 hover:border-brand-500/30 transition-colors duration-200"
++                        >
++                          <div className="flex items-start justify-between mb-2">
++                            <Badge variant="info" size="sm">{course.code}</Badge>
++                            <Button
++                              variant="ghost"
++                              size="sm"
++                              onClick={() => { setSelectedCourse(course.id); setShowUnregisterModal(true); }}
++                              className="text-error-500 hover:bg-error-500/10 -mr-1 -mt-1 text-xs"
++                            >
++                              Unregister
++                            </Button>
++                          </div>
++                          <p className="text-sm font-medium text-surface-100 line-clamp-1 mb-2">{course.title}</p>
++                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-surface-500">
++                            <span className="capitalize">{course.packageType}</span>
++                            <span>{formatNaira(course.amountKobo)}</span>
++                            <span className={`capitalize font-medium ${course.paymentStatus === 'paid' ? 'text-success-400' : 'text-warning-400'}`}>
++                              {course.paymentStatus}
++                            </span>
++                          </div>
++                          <p className="text-xs text-surface-600 mt-1 truncate">
++                            {course.deliveryLocation}
++                          </p>
++                          {course.outlineUrl && (
++                            <a
++                              href={course.outlineUrl}
++                              target="_blank"
++                              rel="noopener noreferrer"
++                              className="inline-flex items-center gap-1 mt-2 text-xs text-brand-400 hover:text-brand-300 transition-colors"
++                            >
++                              <Paperclip className="w-3 h-3" aria-hidden="true" />
++                              View guidelines
++                            </a>
++                          )}
++                        </div>
++                      ))}
++                    </div>
++                  )}
++                </div>
+               </div>
+-            </Card>
++            </div>
+           </div>
+         </div>
+       </div>
+ 
+       <ConfirmModal
+         isOpen={showUnregisterModal}
+-        onClose={() => {
+-          setShowUnregisterModal(false);
+-          setSelectedCourse(null);
+-        }}
++        onClose={() => { setShowUnregisterModal(false); setSelectedCourse(null); }}
+         onConfirm={handleUnregister}
+         title="Unregister from Course"
+-        description="Are you sure you want to unregister from this course? Your slot will be made available to other students."
++        description="Are you sure you want to unregister? Your slot will be made available to other students."
+         confirmText="Unregister"
+         variant="danger"
+         loading={unregisterMutation.isPending}
+@@ -288,10 +297,7 @@ export function StudentDashboard() {
+ 
+       <RegisterPackageModal
+         isOpen={isPackageModalOpen}
+-        onClose={() => {
+-          setIsPackageModalOpen(false);
+-          setSelectedCourseForReg(null);
+-        }}
++        onClose={() => { setIsPackageModalOpen(false); setSelectedCourseForReg(null); }}
+         course={selectedCourseForReg}
+         onRegisterComplete={handleRegisterComplete}
+         isRegistering={registerMutation.isPending}
+diff --git a/src/pages/TermsPage.tsx b/src/pages/TermsPage.tsx
+new file mode 100644
+index 0000000..2257fc8
+--- /dev/null
++++ b/src/pages/TermsPage.tsx
+@@ -0,0 +1,156 @@
++import { useNavigate } from 'react-router-dom';
++import { ArrowLeft } from 'lucide-react';
++
++const EFFECTIVE_DATE = 'June 20, 2026';
++const COMPANY_NAME = 'Quantara';
++const CONTACT_EMAIL = 'support@quantara.ng';
++
++export function TermsPage() {
++  const navigate = useNavigate();
++
++  return (
++    <div className="min-h-screen bg-surface-0 dark:bg-surface-950">
++      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
++        <button
++          onClick={() => navigate(-1)}
++          className="inline-flex items-center gap-2 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 transition-colors cursor-pointer mb-8"
++        >
++          <ArrowLeft className="w-4 h-4" />
++          Back
++        </button>
++
++        <div className="mb-10">
++          <h1 className="text-3xl font-bold text-surface-900 dark:text-surface-100">
++            Terms &amp; Conditions
++          </h1>
++          <p className="mt-2 text-sm text-surface-500 dark:text-surface-400">
++            Effective date: {EFFECTIVE_DATE}
++          </p>
++        </div>
++
++        <div className="prose prose-sm max-w-none text-surface-700 dark:text-surface-300 space-y-8">
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">1. Acceptance of Terms</h2>
++            <p>
++              By registering for any service on {COMPANY_NAME} and completing payment, you confirm that you have read, understood, and agree to be bound by these Terms &amp; Conditions. If you do not agree to these terms, you must not proceed with any purchase.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">2. Service Description</h2>
++            <p>
++              {COMPANY_NAME} provides academic lab report writing and formatting services for registered students. Upon successful payment and submission of your lab guidelines, our team will produce a formatted lab report in accordance with your course requirements. The service does not guarantee any particular academic outcome or grade.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">3. Registration &amp; Eligibility</h2>
++            <ul className="list-disc pl-5 space-y-1.5">
++              <li>You must provide accurate and complete registration information.</li>
++              <li>Each registration is for a single course slot per transaction.</li>
++              <li>Slots are limited and allocated on a first-come, first-served basis.</li>
++              <li>You must be the legitimate holder of the payment method used.</li>
++            </ul>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">4. Payment</h2>
++            <ul className="list-disc pl-5 space-y-1.5">
++              <li>All payments are processed securely via Paystack. {COMPANY_NAME} does not store card details.</li>
++              <li>Prices are listed in Nigerian Naira (NGN) and are inclusive of all applicable fees.</li>
++              <li>Payment must be completed in full before your registration is confirmed.</li>
++              <li>A payment receipt will be sent to your registered email address upon successful transaction.</li>
++              <li>In the event of a failed transaction, no funds will be deducted. If funds are deducted for a failed transaction, contact your bank or reach us at {CONTACT_EMAIL}.</li>
++            </ul>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">5. Refund Policy</h2>
++            <p className="mb-2">
++              Due to the nature of academic services, refunds are subject to the following conditions:
++            </p>
++            <ul className="list-disc pl-5 space-y-1.5">
++              <li><strong className="text-surface-900 dark:text-surface-100">Full refund:</strong> Available if you cancel before work on your report has commenced (within 24 hours of registration).</li>
++              <li><strong className="text-surface-900 dark:text-surface-100">Partial refund:</strong> If work has commenced but the report has not been delivered, a 50% refund may be considered at our discretion.</li>
++              <li><strong className="text-surface-900 dark:text-surface-100">No refund:</strong> Once a completed report has been delivered, no refund will be issued.</li>
++              <li>Refund requests must be submitted to {CONTACT_EMAIL} with your payment reference.</li>
++            </ul>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">6. Delivery</h2>
++            <ul className="list-disc pl-5 space-y-1.5">
++              <li>Delivery timelines are estimates and may vary based on workload and complexity.</li>
++              <li>Pro package students who specify a preferred delivery date will be prioritised accordingly, subject to feasibility.</li>
++              <li>Basic package delivery logistics will be coordinated by our team via your registered contact details.</li>
++              <li>{COMPANY_NAME} is not liable for delays caused by incomplete or inaccurate lab guidelines submitted by the student.</li>
++            </ul>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">7. Lab Guidelines &amp; Submitted Materials</h2>
++            <ul className="list-disc pl-5 space-y-1.5">
++              <li>You are responsible for providing accurate and complete lab guidelines at the time of registration.</li>
++              <li>Submitted files are used solely for the purpose of producing your report and will not be shared with third parties.</li>
++              <li>You represent that you have the right to submit any materials provided and that doing so does not infringe any third-party rights.</li>
++            </ul>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">8. Academic Integrity</h2>
++            <p>
++              {COMPANY_NAME} provides a formatting and writing assistance service. Students are responsible for understanding and complying with their institution's academic integrity policies. {COMPANY_NAME} accepts no liability for any academic misconduct findings or disciplinary action taken against a student by their institution.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">9. Intellectual Property</h2>
++            <p>
++              Upon full payment and delivery, ownership of the produced report transfers to the student. {COMPANY_NAME} retains no rights to use, reproduce, or distribute your report. The {COMPANY_NAME} platform, branding, and codebase remain the exclusive property of {COMPANY_NAME}.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">10. Limitation of Liability</h2>
++            <p>
++              To the fullest extent permitted by law, {COMPANY_NAME} shall not be liable for any indirect, incidental, or consequential damages arising from the use of our services. Our total liability to you for any claim arising from these terms shall not exceed the amount paid by you for the specific service in question.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">11. Privacy</h2>
++            <p>
++              By using {COMPANY_NAME}, you consent to the collection and use of your personal data (name, email, phone, department) for the purpose of delivering our services and communicating with you. We do not sell your data to third parties.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">12. Modifications</h2>
++            <p>
++              {COMPANY_NAME} reserves the right to update these Terms &amp; Conditions at any time. Continued use of the platform after changes are posted constitutes acceptance of the revised terms.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">13. Governing Law</h2>
++            <p>
++              These terms are governed by the laws of the Federal Republic of Nigeria. Any disputes shall be subject to the exclusive jurisdiction of Nigerian courts.
++            </p>
++          </section>
++
++          <section>
++            <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">14. Contact</h2>
++            <p>
++              For questions, disputes, or refund requests, contact us at{' '}
++              <a href={`mailto:${CONTACT_EMAIL}`} className="text-brand-600 dark:text-brand-400 hover:underline">
++                {CONTACT_EMAIL}
++              </a>.
++            </p>
++          </section>
++
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/pages/index.ts b/src/pages/index.ts
+index 633eaa0..c33929b 100644
+--- a/src/pages/index.ts
++++ b/src/pages/index.ts
+@@ -6,3 +6,4 @@ export { AdminDashboard } from './AdminDashboard';
+ export { CourseCatalogPage } from './CourseCatalogPage';
+ export { SettingsPage } from './SettingsPage';
+ export { PaymentCallbackPage } from './PaymentCallbackPage';
++export { TermsPage } from './TermsPage';
+diff --git a/src/types/database.ts b/src/types/database.ts
+index 761d12a..ee43eb0 100644
+--- a/src/types/database.ts
++++ b/src/types/database.ts
+@@ -74,6 +74,7 @@ export interface Database {
+           course_id: string;
+           package_type: 'basic' | 'pro';
+           delivery_location: string;
++          delivery_time: string | null;
+           payment_reference: string | null;
+           payment_status: 'pending' | 'paid' | 'failed';
+           amount_kobo: number;
+@@ -86,6 +87,7 @@ export interface Database {
+           course_id: string;
+           package_type?: 'basic' | 'pro';
+           delivery_location?: string;
++          delivery_time?: string | null;
+           payment_reference?: string | null;
+           payment_status?: 'pending' | 'paid' | 'failed';
+           amount_kobo?: number;
+@@ -98,6 +100,7 @@ export interface Database {
+           course_id?: string;
+           package_type?: 'basic' | 'pro';
+           delivery_location?: string;
++          delivery_time?: string | null;
+           payment_reference?: string | null;
+           payment_status?: 'pending' | 'paid' | 'failed';
+           amount_kobo?: number;
+diff --git a/supabase/migrations/20260620023800_registrations_add_delivery_time.sql b/supabase/migrations/20260620023800_registrations_add_delivery_time.sql
+new file mode 100644
+index 0000000..fcf7139
+--- /dev/null
++++ b/supabase/migrations/20260620023800_registrations_add_delivery_time.sql
+@@ -0,0 +1,2 @@
++ALTER TABLE public.registrations
++  ADD COLUMN IF NOT EXISTS delivery_time timestamptz;
+-- 
+2.54.0.windows.1
+

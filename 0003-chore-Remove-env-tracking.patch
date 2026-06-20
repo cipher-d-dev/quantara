@@ -1,0 +1,33 @@
+From d85ac22e59db85921cd383b14cff33b56bbccb61 Mon Sep 17 00:00:00 2001
+From: Favour Ejiofor <faveejiofor2009@gmail.com>
+Date: Sat, 20 Jun 2026 04:04:55 +0100
+Subject: [PATCH 3/5] chore: Remove env tracking
+
+---
+ server/.env | 13 -------------
+ 1 file changed, 13 deletions(-)
+ delete mode 100644 server/.env
+
+diff --git a/server/.env b/server/.env
+deleted file mode 100644
+index fa5e60a..0000000
+--- a/server/.env
++++ /dev/null
+@@ -1,13 +0,0 @@
+-PORT=5000
+-PAYSTACK_SECRET_KEY=sk_test_7273fc2cebeeae30d1ada2060ae16bc8871f3efe
+-VITE_BASIC_PACKAGE_AMOUNT_KOBO=300000
+-VITE_PRO_PACKAGE_AMOUNT_KOBO=400000
+-VITE_PAYSTACK_CURRENCY=NGN
+-
+-TELEGRAM_BOT_TOKEN=8812703966:AAG2Z3NFsmlEK0DAciFF--HoyNc5-d2cfHU
+-TELEGRAM_CHAT_ID=-5109974919
+-RESEND_FROM=Quantara <receipts@isbmpa.com>
+-RESEND_API_KEY="re_Ay2xEkUh_26DCn1mxKcxyCfEYmN9ZcQP8"
+-
+-SUPABASE_URL=https://wrgtdnouvahimgsioisa.supabase.co
+-SUPABASE_SERVICE_ROLE_KEY=sb_secret_0kqRs1osu-axaNFy3VTrpw_NKqA7dbW
+\ No newline at end of file
+-- 
+2.54.0.windows.1
+
